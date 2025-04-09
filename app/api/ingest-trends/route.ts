@@ -43,6 +43,7 @@ export async function GET() {
       // ✅ NEW: Return raw HTML if OpenAI does not return JSON
       const contentType = openaiRes.headers.get("content-type") || "";
       if (!contentType.includes("application/json")) {
+        console.warn("OpenAI returned HTML instead of JSON.");
         return new Response(text, {
           status: openaiRes.status,
           headers: { 'Content-Type': 'text/html' },
@@ -76,14 +77,12 @@ export async function GET() {
         continue;
       }
 
-      const { error } = await supabase.from('trends').insert([
-        {
-          title: parsed.title,
-          description: parsed.description,
-          category: parsed.category,
-          ideas: parsed.ideas,
-        },
-      ]);
+      const { error } = await supabase.from('trends').insert([{
+        title: parsed.title,
+        description: parsed.description,
+        category: parsed.category,
+        ideas: parsed.ideas,
+      }]);
 
       if (!error) {
         newTrends.push(parsed);
@@ -96,7 +95,15 @@ export async function GET() {
       trends: newTrends,
     });
 
-  } catch (err) {
+  } catch (err: any) {
+    // ✅ If OpenAI failed with HTML, send it raw
+    if (typeof err?.message === 'string' && err.message.includes('<body')) {
+      return new Response(err.message, {
+        status: 500,
+        headers: { 'Content-Type': 'text/html' },
+      });
+    }
+
     console.error("Ingest API error:", err);
     return NextResponse.json({
       success: false,

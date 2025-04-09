@@ -11,7 +11,8 @@ type RedditPost = {
 };
 
 export async function GET() {
-  console.log("OPENAI_API_KEY:", openaiApiKey); // for debugging
+  console.log("OPENAI_API_KEY:", openaiApiKey); // Diagnostic log
+
   try {
     // 1. Fetch Reddit post titles
     const redditRes = await fetch(redditUrl);
@@ -21,15 +22,14 @@ export async function GET() {
     const newTrends = [];
 
     for (const title of posts) {
-      // 2. Generate AI summary with OpenAI (using new endpoint)
+      // 2. Generate AI summary with OpenAI (correct endpoint + headers)
       const prompt = `You are a trend researcher. Analyze this phrase and return a JSON object:\n\n- title: a short catchy trend title\n- description: what the trend is and why it’s interesting (1-2 sentences)\n- category: one of travel, health, finance, tech\n- ideas: 2 bullet content ideas (blog, YouTube, etc.)\n\nTrend keyword: "${title}"`;
 
-      const openaiRes = await fetch('https://api.openai.com/openai/v1/chat/completions', {
+      const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${openaiApiKey}`,
-          'OpenAI-Beta': 'assistants=v1',
         },
         body: JSON.stringify({
           model: 'gpt-3.5-turbo',
@@ -70,6 +70,7 @@ export async function GET() {
       }
     }
 
+    // 5. Return success
     return NextResponse.json({
       success: true,
       inserted: newTrends.length,

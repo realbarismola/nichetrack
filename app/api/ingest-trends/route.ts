@@ -45,11 +45,15 @@ let aiData;
 try {
   aiData = JSON.parse(text);
 } catch {
-  return NextResponse.json({
-    success: false,
-    error: "OpenAI returned invalid JSON: " + text.slice(0, 100),
+  // Show the full HTML response in the browser
+  return new Response(text, {
+    status: 500,
+    headers: {
+      'Content-Type': 'text/html',
+    },
   });
 }
+
 
 
 const content = aiData?.choices?.[0]?.message?.content;

@@ -77,10 +77,11 @@ export async function GET() {
       trends: newTrends,
     });
 
-  } catch {
+  } catch (err) {
+    console.error("Ingest API error:", err);
     return NextResponse.json({
       success: false,
-      error: 'Something went wrong.',
+      error: err instanceof Error ? err.message : String(err),
     });
   }
 }

@@ -12,7 +12,7 @@ type RedditPost = {
 
 export async function GET() {
   try {
-    // Fetch top Reddit post titles
+    // 1. Fetch Reddit post titles
     const redditRes = await fetch(redditUrl);
     const redditData = await redditRes.json();
     const posts = redditData.data.children.map((post: RedditPost) => post.data.title);
@@ -20,6 +20,7 @@ export async function GET() {
     const newTrends = [];
 
     for (const title of posts) {
+      // 2. Generate AI summary with OpenAI
       const prompt = `You are a trend researcher. Analyze this phrase and return a JSON object:\n\n- title: a short catchy trend title\n- description: what the trend is and why it’s interesting (1-2 sentences)\n- category: one of travel, health, finance, tech\n- ideas: 2 bullet content ideas (blog, YouTube, etc.)\n\nTrend keyword: "${title}"`;
 
       const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -38,10 +39,9 @@ export async function GET() {
       const aiData = await openaiRes.json();
       const content = aiData?.choices?.[0]?.message?.content;
 
-      if (!content) {
-        continue;
-      }
+      if (!content) continue;
 
+      // 3. Clean JSON (remove markdown wrappers)
       const cleaned = content
         .replace(/^```json\n?/, '')
         .replace(/^```/, '')
@@ -51,25 +51,36 @@ export async function GET() {
       let parsed;
       try {
         parsed = JSON.parse(cleaned);
-      } catch (err) {
-        continue;
+      } catch {
+        continue; // skip this trend if JSON is broken
       }
 
-      const { error } = await supabase.from('trends').insert([{
-        title: parsed.title,
-        description: parsed.description,
-        category: parsed.category,
-        ideas: parsed.ideas,
-      }]);
+      // 4. Save to Supabase
+      const { error } = await supabase.from('trends').insert([
+        {
+          title: parsed.title,
+          description: parsed.description,
+          category: parsed.category,
+          ideas: parsed.ideas,
+        },
+      ]);
 
       if (!error) {
         newTrends.push(parsed);
       }
     }
 
-    return NextResponse.json({ success: true, inserted: newTrends.length, trends: newTrends });
+    // 5. Return success response
+    return NextResponse.json({
+      success: true,
+      inserted: newTrends.length,
+      trends: newTrends,
+    });
 
   } catch {
-    return NextResponse.json({ success: false, error: "Something went wrong." });
-  }  
+    return NextResponse.json({
+      success: false,
+      error: 'Something went wrong.',
+    });
+  }
 }

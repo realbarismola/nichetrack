@@ -38,8 +38,21 @@ export async function GET() {
         }),
       });
 
-      const aiData = await openaiRes.json();
-      const content = aiData?.choices?.[0]?.message?.content;
+      const text = await openaiRes.text();
+console.log("OpenAI raw response:", text);
+
+let aiData;
+try {
+  aiData = JSON.parse(text);
+} catch (err) {
+  return NextResponse.json({
+    success: false,
+    error: "OpenAI returned invalid JSON: " + text.slice(0, 100), // first 100 chars
+  });
+}
+
+const content = aiData?.choices?.[0]?.message?.content;
+
 
       if (!content) continue;
 

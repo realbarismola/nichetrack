@@ -44,12 +44,13 @@ console.log("OpenAI raw response:", text);
 let aiData;
 try {
   aiData = JSON.parse(text);
-} catch (err) {
+} catch {
   return NextResponse.json({
     success: false,
-    error: "OpenAI returned invalid JSON: " + text.slice(0, 100), // first 100 chars
+    error: "OpenAI returned invalid JSON: " + text.slice(0, 100),
   });
 }
+
 
 const content = aiData?.choices?.[0]?.message?.content;
 

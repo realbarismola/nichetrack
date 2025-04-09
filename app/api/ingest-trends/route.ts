@@ -9,7 +9,7 @@ export async function GET() {
     // 1. Fetch top Reddit post titles
     const redditRes = await fetch(redditUrl);
     const redditData = await redditRes.json();
-    const posts = redditData.data.children.map((post: any) => post.data.title);
+    const posts = redditData.data.children.map((post: unknown) => (post as any).data.title);
 
     const newTrends = [];
 
@@ -74,8 +74,9 @@ export async function GET() {
 
     return NextResponse.json({ success: true, inserted: newTrends.length, trends: newTrends });
 
-  } catch (err: any) {
-    console.error('Error in trend ingestion:', err);
-    return NextResponse.json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ success: false, error: errorMessage });
   }
+  
 }

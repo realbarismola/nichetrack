@@ -11,10 +11,10 @@ type RedditPost = {
 };
 
 export async function GET() {
-  console.log("OPENAI_API_KEY:", openaiApiKey); // Debugging: ensure env variable is loaded
+  console.log("OPENAI_API_KEY loaded:", !!openaiApiKey);
 
   try {
-    // 1. Fetch top Reddit post titles
+    // 1. Fetch Reddit post titles
     const redditRes = await fetch(redditUrl);
     const redditData = await redditRes.json();
     const posts = redditData.data.children.map((post: RedditPost) => post.data.title);
@@ -22,10 +22,8 @@ export async function GET() {
     const newTrends = [];
 
     for (const title of posts) {
-      // 2. Create OpenAI prompt
       const prompt = `You are a trend researcher. Analyze this phrase and return a JSON object:\n\n- title: a short catchy trend title\n- description: what the trend is and why it’s interesting (1-2 sentences)\n- category: one of travel, health, finance, tech\n- ideas: 2 bullet content ideas (blog, YouTube, etc.)\n\nTrend keyword: "${title}"`;
 
-      // 3. Call OpenAI
       const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -42,32 +40,29 @@ export async function GET() {
       const text = await openaiRes.text();
       console.log("OpenAI raw response:", text);
 
+      // ✅ NEW: Return raw HTML if OpenAI does not return JSON
+      const contentType = openaiRes.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        return new Response(text, {
+          status: openaiRes.status,
+          headers: { 'Content-Type': 'text/html' },
+        });
+      }
+
+      // Try to parse the JSON
       let aiData;
       try {
         aiData = JSON.parse(text);
       } catch {
-        // Not valid JSON — return raw HTML response
         return new Response(text, {
           status: 500,
-          headers: {
-            'Content-Type': 'text/html',
-          },
+          headers: { 'Content-Type': 'text/html' },
         });
       }
 
-      // JSON parsed, but still malformed or unauthorized
-      if (!aiData?.choices?.[0]?.message?.content) {
-        return new Response(text, {
-          status: 500,
-          headers: {
-            'Content-Type': 'text/html',
-          },
-        });
-      }
+      const content = aiData?.choices?.[0]?.message?.content;
+      if (!content) continue;
 
-      const content = aiData.choices[0].message.content;
-
-      // 4. Clean and parse the returned JSON content
       const cleaned = content
         .replace(/^```json\n?/, '')
         .replace(/^```/, '')
@@ -78,16 +73,17 @@ export async function GET() {
       try {
         parsed = JSON.parse(cleaned);
       } catch {
-        continue; // skip broken ones
+        continue;
       }
 
-      // 5. Insert into Supabase
-      const { error } = await supabase.from('trends').insert([{
-        title: parsed.title,
-        description: parsed.description,
-        category: parsed.category,
-        ideas: parsed.ideas,
-      }]);
+      const { error } = await supabase.from('trends').insert([
+        {
+          title: parsed.title,
+          description: parsed.description,
+          category: parsed.category,
+          ideas: parsed.ideas,
+        },
+      ]);
 
       if (!error) {
         newTrends.push(parsed);

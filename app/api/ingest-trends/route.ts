@@ -40,7 +40,7 @@ export async function GET() {
       const text = await openaiRes.text();
       console.log("OpenAI raw response:", text);
 
-      // ✅ NEW: Return raw HTML if OpenAI does not return JSON
+      // ✅ Return raw HTML if OpenAI does not return JSON
       const contentType = openaiRes.headers.get("content-type") || "";
       if (!contentType.includes("application/json")) {
         console.warn("OpenAI returned HTML instead of JSON.");
@@ -50,7 +50,7 @@ export async function GET() {
         });
       }
 
-      // Try to parse the JSON
+      // Try to parse JSON
       let aiData;
       try {
         aiData = JSON.parse(text);
@@ -95,16 +95,19 @@ export async function GET() {
       trends: newTrends,
     });
 
-  } catch (err: any) {
-    // ✅ If OpenAI failed with HTML, send it raw
-    if (typeof err?.message === 'string' && err.message.includes('<body')) {
-      return new Response(err.message, {
+  } catch (err) {
+    // ✅ Fallback for unexpected error (no "any" typing)
+    console.error("Ingest API error:", err);
+
+    const htmlLike = typeof err === 'string' && err.includes('<body');
+
+    if (htmlLike) {
+      return new Response(err, {
         status: 500,
         headers: { 'Content-Type': 'text/html' },
       });
     }
 
-    console.error("Ingest API error:", err);
     return NextResponse.json({
       success: false,
       error: err instanceof Error ? err.message : String(err),

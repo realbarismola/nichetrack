@@ -9,7 +9,13 @@ export async function GET() {
     // 1. Fetch top Reddit post titles
     const redditRes = await fetch(redditUrl);
     const redditData = await redditRes.json();
-    const posts = redditData.data.children.map((post: unknown) => (post as any).data.title);
+    type RedditPost = {
+      data: {
+        title: string;
+      };
+    };
+    
+    const posts = redditData.data.children.map((post: RedditPost) => post.data.title);    
 
     const newTrends = [];
 

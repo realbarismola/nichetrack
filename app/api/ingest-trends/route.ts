@@ -22,7 +22,7 @@ export async function GET() {
     const newTrends = [];
 
     for (const title of posts) {
-      // 2. Generate AI summary with OpenAI (correct endpoint + headers)
+      // 2. Generate AI summary with OpenAI
       const prompt = `You are a trend researcher. Analyze this phrase and return a JSON object:\n\n- title: a short catchy trend title\n- description: what the trend is and why it’s interesting (1-2 sentences)\n- category: one of travel, health, finance, tech\n- ideas: 2 bullet content ideas (blog, YouTube, etc.)\n\nTrend keyword: "${title}"`;
 
       const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -39,28 +39,25 @@ export async function GET() {
       });
 
       const text = await openaiRes.text();
-console.log("OpenAI raw response:", text);
+      console.log("OpenAI raw response:", text);
 
-let aiData;
-try {
-  aiData = JSON.parse(text);
-} catch {
-  // Show the full HTML response in the browser
-  return new Response(text, {
-    status: 500,
-    headers: {
-      'Content-Type': 'text/html',
-    },
-  });
-}
+      let aiData;
+      try {
+        aiData = JSON.parse(text);
+      } catch {
+        // Return the HTML OpenAI error page for inspection
+        return new Response(text, {
+          status: 500,
+          headers: {
+            'Content-Type': 'text/html',
+          },
+        });
+      }
 
-
-
-const content = aiData?.choices?.[0]?.message?.content;
-
-
+      const content = aiData?.choices?.[0]?.message?.content;
       if (!content) continue;
 
+      // 3. Clean up JSON formatting
       const cleaned = content
         .replace(/^```json\n?/, '')
         .replace(/^```/, '')
@@ -74,6 +71,7 @@ const content = aiData?.choices?.[0]?.message?.content;
         continue;
       }
 
+      // 4. Save to Supabase
       const { error } = await supabase.from('trends').insert([
         {
           title: parsed.title,

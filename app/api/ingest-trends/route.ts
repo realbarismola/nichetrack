@@ -69,8 +69,7 @@ export async function GET() {
 
     return NextResponse.json({ success: true, inserted: newTrends.length, trends: newTrends });
 
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ success: false, error: errorMessage });
+  } catch {
+    return NextResponse.json({ success: false, error: "Something went wrong." });
   }  
 }

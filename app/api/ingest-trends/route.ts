@@ -72,5 +72,5 @@ export async function GET() {
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ success: false, error: errorMessage });
-  }
+  }  
 }

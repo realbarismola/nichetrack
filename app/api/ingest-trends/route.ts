@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 const openaiApiKey = process.env.OPENAI_API_KEY;
 const openaiOrg = process.env.OPENAI_ORG_ID;
+
 const redditUrl = 'https://www.reddit.com/r/Entrepreneur/top.json?limit=5&t=day';
 
 type RedditPost = {
@@ -22,15 +23,14 @@ export async function GET() {
   }
 
   try {
-    // Fetch Reddit titles
+    // 1. Fetch Reddit top posts
     const redditRes = await fetch(redditUrl);
     const redditData = await redditRes.json();
     const posts = redditData.data.children.map((post: RedditPost) => post.data.title);
 
-    // Build the prompt
     const prompt = `You are a trend researcher. Analyze this phrase and return a JSON object:\n\n- title: a short catchy trend title\n- description: what the trend is and why it’s interesting (1-2 sentences)\n- category: one of travel, health, finance, tech\n- ideas: 2 bullet content ideas (blog, YouTube, etc.)\n\nTrend keyword: "${posts[0]}"`;
 
-    // Send to OpenAI
+    // 2. Call OpenAI API manually
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -45,31 +45,22 @@ export async function GET() {
       }),
     });
 
-    const text = await res.text();
+    // 3. Log raw response for debugging
+    console.log("📦 OpenAI response status:", res.status);
+    console.log("📦 OpenAI response headers:", [...res.headers.entries()]);
+    const bodyText = await res.text(); // don't parse just yet
+    console.log("📄 OpenAI raw response body:", bodyText);
 
-    // Diagnostic logging
-    console.log("🧠 OpenAI response status:", res.status);
-    console.log("🧠 OpenAI response URL:", res.url);
-    console.log("🧠 OpenAI raw response:", text);
-
-    // If it's not valid JSON or failed
-    if (!res.ok) {
-      return NextResponse.json({
-        success: false,
-        error: `OpenAI API returned status ${res.status}`,
-        body: text.slice(0, 300),
-      });
-    }
-
+    // 4. Try parsing it
     let aiData;
     try {
-      aiData = JSON.parse(text);
-    } catch (err) {
-      console.error("❌ Failed to parse OpenAI JSON:", err);
+      aiData = JSON.parse(bodyText);
+    } catch (parseErr) {
+      console.error("❌ JSON parse error:", parseErr);
       return NextResponse.json({
         success: false,
-        error: 'Invalid JSON from OpenAI',
-        raw: text.slice(0, 300),
+        error: 'Failed to parse OpenAI response as JSON.',
+        raw: bodyText,
       });
     }
 

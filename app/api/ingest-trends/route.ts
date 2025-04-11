@@ -51,11 +51,12 @@ export async function GET() {
     try {
       aiData = JSON.parse(text);
     } catch (err) {
-      return new Response(text, {
-        status: res.status,
-        headers: { 'Content-Type': 'text/html' },
+      console.error("Ingest API error:", err);
+      return NextResponse.json({
+        success: false,
+        error: err instanceof Error ? err.message : String(err),
       });
-    }
+    }    
 
     const content = aiData?.choices?.[0]?.message?.content;
     if (!content) {

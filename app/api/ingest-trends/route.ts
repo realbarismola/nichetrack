@@ -51,7 +51,7 @@ export async function GET() {
       let aiData;
       try {
         aiData = JSON.parse(text);
-      } catch (parseErr) {
+      } catch {
         return new Response(`<html><body><h1>🚨 JSON PARSE ERROR</h1><pre>${text.slice(0, 1000)}</pre></body></html>`, {
           status: 500,
           headers: { 'Content-Type': 'text/html' },

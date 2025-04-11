@@ -12,6 +12,7 @@ type RedditPost = {
 };
 
 export async function GET() {
+  console.log("🚀 ingest-trends route was HIT");
   console.log("🚀 Ingest endpoint HIT");
   console.log("🛠️ BUILD_ID:", BUILD_ID);
   console.log("🔐 OPENAI_API_KEY loaded:", !!openaiApiKey);

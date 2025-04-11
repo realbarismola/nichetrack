@@ -38,23 +38,35 @@ export async function GET() {
       });
 
       const text = await openaiRes.text();
-      console.log("🔍 OpenAI raw response:", text);
+      console.log("🔍 Raw OpenAI response text:", text.slice(0, 300));
 
-      // 🚨 Return full HTML debug page
-      return new Response(
-        `<html><body><h1>🚨 RAW OpenAI RESPONSE DEBUG</h1><pre>${text.slice(0, 1000)}</pre></body></html>`,
-        {
-          status: 200,
-          headers: { 'Content-Type': 'text/html' },
-        }
-      );
+      // Check if it's HTML (error page)
+      if (text.startsWith('<')) {
+        return NextResponse.json({
+          success: false,
+          error: 'Received HTML instead of JSON. Your OpenAI API key may be invalid or the request failed.',
+          raw: text.slice(0, 300),
+        });
+      }
+
+      let aiData;
+      try {
+        aiData = JSON.parse(text);
+      } catch (err) {
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to parse OpenAI response as JSON.',
+          raw: text.slice(0, 300),
+        });
+      }
+
+      const content = aiData?.choices?.[0]?.message?.content;
+      console.log("✅ OpenAI content:", content?.slice(0, 200));
+
+      return NextResponse.json({ success: true, aiContent: content });
     }
 
-    return NextResponse.json({
-      success: true,
-      inserted: 0,
-      trends: [],
-    });
+    return NextResponse.json({ success: true, inserted: 0, trends: [] });
 
   } catch (err) {
     console.error("Ingest API error:", err);

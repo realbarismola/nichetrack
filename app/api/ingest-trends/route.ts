@@ -38,35 +38,37 @@ export async function GET() {
       });
 
       const text = await openaiRes.text();
-      console.log("🔍 Raw OpenAI response text:", text.slice(0, 300));
+      console.log("🔍 OpenAI raw response:", text);
 
-      // Check if it's HTML (error page)
-      if (text.startsWith('<')) {
-        return NextResponse.json({
-          success: false,
-          error: 'Received HTML instead of JSON. Your OpenAI API key may be invalid or the request failed.',
-          raw: text.slice(0, 300),
+      const contentType = openaiRes.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        return new Response(text, {
+          status: openaiRes.status,
+          headers: { 'Content-Type': 'text/html' },
         });
       }
 
       let aiData;
       try {
         aiData = JSON.parse(text);
-      } catch (err) {
-        return NextResponse.json({
-          success: false,
-          error: 'Failed to parse OpenAI response as JSON.',
-          raw: text.slice(0, 300),
+      } catch (parseErr) {
+        return new Response(`<html><body><h1>🚨 JSON PARSE ERROR</h1><pre>${text.slice(0, 1000)}</pre></body></html>`, {
+          status: 500,
+          headers: { 'Content-Type': 'text/html' },
         });
       }
 
       const content = aiData?.choices?.[0]?.message?.content;
-      console.log("✅ OpenAI content:", content?.slice(0, 200));
+      console.log("✅ Extracted content:", content);
 
       return NextResponse.json({ success: true, aiContent: content });
     }
 
-    return NextResponse.json({ success: true, inserted: 0, trends: [] });
+    return NextResponse.json({
+      success: true,
+      inserted: 0,
+      trends: [],
+    });
 
   } catch (err) {
     console.error("Ingest API error:", err);

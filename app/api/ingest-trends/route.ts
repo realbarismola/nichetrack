@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 const openaiApiKey = process.env.OPENAI_API_KEY;
-const openaiOrg = process.env.OPENAI_ORG_ID; // Only this is needed if required
+const openaiOrg = process.env.OPENAI_ORG_ID;
 const redditUrl = 'https://www.reddit.com/r/Entrepreneur/top.json?limit=5&t=day';
 
 type RedditPost = {
@@ -43,12 +43,13 @@ export async function GET() {
         }),
       });
 
+      console.log("🔄 OpenAI response status:", openaiRes.status);
       const text = await openaiRes.text();
-      console.log("🔍 OpenAI raw response:", text);
+      console.log("📄 OpenAI raw response:", text.slice(0, 500));
 
       const contentType = openaiRes.headers.get("content-type") || "";
       if (!contentType.includes("application/json")) {
-        return new Response(text, {
+        return new Response(`<html><body><h1>🚨 OpenAI did not return JSON</h1><pre>Status: ${openaiRes.status}</pre><pre>${text.slice(0, 1000)}</pre></body></html>`, {
           status: openaiRes.status,
           headers: { 'Content-Type': 'text/html' },
         });

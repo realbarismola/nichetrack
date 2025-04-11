@@ -52,9 +52,11 @@ export async function GET() {
       });
 
       const text = await openaiRes.text();
-      const contentType = openaiRes.headers.get('content-type') || '';
+    const contentType = openaiRes.headers.get('content-type') || '';
+    console.log("📦 OpenAI content-type:", contentType);
+    console.log("📦 OpenAI status:", openaiRes.status);
+    console.log("📦 First 200 chars of body:", text.slice(0, 200));
 
-      console.log("📦 OpenAI response content-type:", contentType);
 
       // Return raw HTML if OpenAI didn’t return JSON
       if (!contentType.includes('application/json')) {

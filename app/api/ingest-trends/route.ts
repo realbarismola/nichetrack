@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 const openaiKey = process.env.OPENAI_API_KEY;
 const openaiOrg = process.env.OPENAI_ORG_ID;
+
 const redditUrl = 'https://www.reddit.com/r/Entrepreneur/top.json?limit=5&t=day';
 
 type RedditPost = {
@@ -21,14 +22,14 @@ export async function GET() {
   }
 
   try {
-    // 1. Get Reddit post title
+    // 1. Get keyword from Reddit
     const redditRes = await fetch(redditUrl);
     const redditData = await redditRes.json();
     const posts = redditData.data.children.map((post: RedditPost) => post.data.title);
     const keyword = JSON.stringify(posts[0] || 'Default keyword').slice(1, -1);
-    console.log("📰 First Reddit title:", keyword);
+    console.log("📰 Reddit keyword:", keyword);
 
-    // 2. Create OpenAI prompt
+    // 2. Prompt
     const prompt = `You are a trend researcher. Analyze this phrase and return a JSON object:\n\n- title: a short catchy trend title\n- description: what the trend is and why it’s interesting (1-2 sentences)\n- category: one of travel, health, finance, tech\n- ideas: 2 bullet content ideas (blog, YouTube, etc.)\n\nTrend keyword: "${keyword}"`;
 
     const payload = {
@@ -37,7 +38,7 @@ export async function GET() {
       temperature: 0.7,
     };
 
-    // 3. Request to OpenAI
+    // 3. Call OpenAI
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -51,43 +52,52 @@ export async function GET() {
     const status = res.status;
     const contentType = res.headers.get('content-type') || '';
     const bodyText = await res.text();
+    const headers = Object.fromEntries(res.headers.entries());
 
     console.log("📦 OpenAI response status:", status);
-    console.log("📦 OpenAI content-type:", contentType);
-    console.log("📄 OpenAI raw body (preview):", bodyText.slice(0, 300));
+    console.log("📦 OpenAI headers:", headers);
+    console.log("📄 OpenAI raw body:", bodyText.slice(0, 300));
 
-    // 4. Detect and handle HTML (non-JSON) response
+    // 4. Validate response type
     if (!contentType.includes('application/json')) {
       return NextResponse.json({
         success: false,
-        error: 'OpenAI returned non-JSON response (likely HTML error page)',
+        error: 'Non-JSON response from OpenAI',
         status,
-        contentType,
-        preview: bodyText.slice(0, 500),
+        preview: bodyText.slice(0, 300),
+        headers,
       }, { status });
     }
 
-    // 5. Try to parse the response as JSON
+    // 5. Try parse
     let aiData;
     try {
       aiData = JSON.parse(bodyText);
     } catch (err) {
-      console.error("❌ JSON parse error:", err);
       return NextResponse.json({
         success: false,
-        error: 'Failed to parse OpenAI response.',
-        raw: bodyText,
+        error: 'Failed to parse JSON from OpenAI',
+        status,
+        preview: bodyText.slice(0, 300),
+        headers,
       }, { status });
     }
 
     const content = aiData?.choices?.[0]?.message?.content;
+    if (!content) {
+      return NextResponse.json({
+        success: false,
+        error: 'OpenAI returned no content',
+        status,
+        aiData,
+      }, { status });
+    }
 
     return NextResponse.json({
       success: true,
-      aiContent: content || null,
-      raw: aiData,
-    });
-
+      promptUsed: prompt,
+      aiContent: content,
+    }, { status });
   } catch (err) {
     console.error("❌ Ingest route error:", err);
     return NextResponse.json({

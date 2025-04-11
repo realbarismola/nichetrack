@@ -17,7 +17,6 @@ export async function GET() {
   }
 
   try {
-    // 1. Fetch Reddit post titles
     const redditRes = await fetch(redditUrl);
     const redditData = await redditRes.json();
     const posts = redditData.data.children.map((post: RedditPost) => post.data.title);
@@ -41,11 +40,14 @@ export async function GET() {
       const text = await openaiRes.text();
       console.log("🔍 OpenAI raw response:", text);
 
-      // 🚨 TEMPORARY: Force return OpenAI raw response to browser for debugging
-      return new Response(text, {
-        status: 200,
-        headers: { 'Content-Type': 'text/html' },
-      });
+      // 🚨 Return full HTML debug page
+      return new Response(
+        `<html><body><h1>🚨 RAW OpenAI RESPONSE DEBUG</h1><pre>${text.slice(0, 1000)}</pre></body></html>`,
+        {
+          status: 200,
+          headers: { 'Content-Type': 'text/html' },
+        }
+      );
     }
 
     return NextResponse.json({

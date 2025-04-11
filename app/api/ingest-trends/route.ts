@@ -45,7 +45,7 @@ export async function GET() {
       }),
     });
 
-    // 3. Log raw response for debugging
+    // 3. Log raw response for debuggingconsole.log("📦 OpenAI response status:", res.status);
     console.log("📦 OpenAI response status:", res.status);
     console.log("📦 OpenAI response headers:", [...res.headers.entries()]);
     const bodyText = await res.text(); // don't parse just yet

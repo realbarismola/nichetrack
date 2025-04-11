@@ -73,7 +73,7 @@ export async function GET() {
     let aiData;
     try {
       aiData = JSON.parse(bodyText);
-    } catch (err) {
+    } catch (_) {
       return NextResponse.json({
         success: false,
         error: 'Failed to parse JSON from OpenAI',
@@ -82,6 +82,7 @@ export async function GET() {
         headers,
       }, { status });
     }
+    
 
     const content = aiData?.choices?.[0]?.message?.content;
     if (!content) {

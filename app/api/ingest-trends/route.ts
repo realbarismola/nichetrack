@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 const openaiApiKey = process.env.OPENAI_API_KEY;
 const openaiOrg = process.env.OPENAI_ORG_ID;
+const openaiProject = process.env.OPENAI_PROJECT_ID;
 const redditUrl = 'https://www.reddit.com/r/Entrepreneur/top.json?limit=5&t=day';
 
 type RedditPost = {
@@ -15,6 +16,7 @@ export async function GET() {
   console.log("🔐 ENV:", {
     OPENAI_API_KEY: !!openaiApiKey,
     OPENAI_ORG_ID: !!openaiOrg,
+    OPENAI_PROJECT_ID: !!openaiProject,
   });
 
   if (!openaiApiKey) {
@@ -35,6 +37,7 @@ export async function GET() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${openaiApiKey}`,
           ...(openaiOrg ? { 'OpenAI-Organization': openaiOrg } : {}),
+          ...(openaiProject ? { 'OpenAI-Project': openaiProject } : {}),
         },
         body: JSON.stringify({
           model: 'gpt-3.5-turbo',

@@ -13,6 +13,11 @@ type RedditPost = {
 
 export async function GET() {
   console.log("✅ /api/ingest-trends route is alive!");
+  console.log("🔐 ENV:", {
+    OPENAI_API_KEY: !!openaiApiKey,
+    OPENAI_PROJECT_ID: !!openaiProject,
+    OPENAI_ORG_ID: !!openaiOrg,
+  });
 
   if (!openaiApiKey || !openaiProject || !openaiOrg) {
     return NextResponse.json({ success: false, error: 'Missing OpenAI credentials in environment' });

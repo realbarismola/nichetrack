@@ -21,7 +21,7 @@ export async function GET() {
   }
 
   try {
-    // 1. Fetch Reddit data
+    // 1. Get Reddit trend
     const redditRes = await fetch(redditUrl);
     const redditData = await redditRes.json();
     const posts = redditData.data.children.map((post: RedditPost) => post.data.title);
@@ -37,7 +37,7 @@ export async function GET() {
       temperature: 0.7,
     };
 
-    // 3. Request OpenAI
+    // 3. Call OpenAI
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -49,21 +49,43 @@ export async function GET() {
     });
 
     const status = res.status;
+    const contentType = res.headers.get('content-type') || '';
     const headers = Object.fromEntries(res.headers.entries());
     const bodyText = await res.text();
 
     console.log("📦 OpenAI response status:", status);
-    console.log("📦 OpenAI headers:", headers);
-    console.log("📄 OpenAI raw body:", bodyText);
+    console.log("📦 OpenAI content-type:", contentType);
+    console.log("📄 OpenAI raw body (preview):", bodyText.slice(0, 300));
 
-    // ✅ Parse OpenAI response
-    const aiData = JSON.parse(bodyText);
-    console.log("✅ Parsed OpenAI response:", aiData);
+    // 4. Handle non-JSON responses safely
+    if (!contentType.includes('application/json')) {
+      return NextResponse.json({
+        success: false,
+        error: 'OpenAI returned non-JSON response (likely HTML error page)',
+        status,
+        contentType,
+        preview: bodyText.slice(0, 500),
+      }, { status });
+    }
+
+    // 5. Parse and return content
+    let aiData;
+    try {
+      aiData = JSON.parse(bodyText);
+    } catch (err) {
+      console.error("❌ JSON parse error:", err);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to parse OpenAI response.',
+        raw: bodyText,
+      }, { status });
+    }
+
+    const content = aiData?.choices?.[0]?.message?.content;
 
     return NextResponse.json({
       success: true,
-      promptUsed: prompt,
-      aiContent: aiData?.choices?.[0]?.message?.content || null,
+      aiContent: content || null,
       raw: aiData,
     });
 

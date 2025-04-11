@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
+import OpenAI from 'openai';
 
-const openaiApiKey = process.env.OPENAI_API_KEY;
-const openaiOrg = process.env.OPENAI_ORG_ID;
-const openaiProject = process.env.OPENAI_PROJECT_ID;
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  organization: process.env.OPENAI_ORG_ID,
+  project: process.env.OPENAI_PROJECT_ID,
+});
+
 const redditUrl = 'https://www.reddit.com/r/Entrepreneur/top.json?limit=5&t=day';
 
 type RedditPost = {
@@ -14,12 +18,12 @@ type RedditPost = {
 export async function GET() {
   console.log("✅ /api/ingest-trends route is alive!");
   console.log("🔐 ENV:", {
-    OPENAI_API_KEY: !!openaiApiKey,
-    OPENAI_ORG_ID: !!openaiOrg,
-    OPENAI_PROJECT_ID: !!openaiProject,
+    OPENAI_API_KEY: !!process.env.OPENAI_API_KEY,
+    OPENAI_ORG_ID: !!process.env.OPENAI_ORG_ID,
+    OPENAI_PROJECT_ID: !!process.env.OPENAI_PROJECT_ID,
   });
 
-  if (!openaiApiKey) {
+  if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ success: false, error: 'Missing OpenAI credentials in environment' });
   }
 
@@ -31,44 +35,13 @@ export async function GET() {
     for (const title of posts) {
       const prompt = `You are a trend researcher. Analyze this phrase and return a JSON object:\n\n- title: a short catchy trend title\n- description: what the trend is and why it’s interesting (1-2 sentences)\n- category: one of travel, health, finance, tech\n- ideas: 2 bullet content ideas (blog, YouTube, etc.)\n\nTrend keyword: "${title}"`;
 
-      const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openaiApiKey}`,
-          ...(openaiOrg ? { 'OpenAI-Organization': openaiOrg } : {}),
-          ...(openaiProject ? { 'OpenAI-Project': openaiProject } : {}),
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.7,
-        }),
+      const chat = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
       });
 
-      console.log("🔄 OpenAI response status:", openaiRes.status);
-      const text = await openaiRes.text();
-      console.log("📄 OpenAI raw response:", text.slice(0, 500));
-
-      const contentType = openaiRes.headers.get("content-type") || "";
-      if (!contentType.includes("application/json")) {
-        return new Response(`<html><body><h1>🚨 OpenAI did not return JSON</h1><pre>Status: ${openaiRes.status}</pre><pre>${text.slice(0, 1000)}</pre></body></html>`, {
-          status: openaiRes.status,
-          headers: { 'Content-Type': 'text/html' },
-        });
-      }
-
-      let aiData;
-      try {
-        aiData = JSON.parse(text);
-      } catch {
-        return new Response(`<html><body><h1>🚨 JSON PARSE ERROR</h1><pre>${text.slice(0, 1000)}</pre></body></html>`, {
-          status: 500,
-          headers: { 'Content-Type': 'text/html' },
-        });
-      }
-
-      const content = aiData?.choices?.[0]?.message?.content;
+      const content = chat.choices[0]?.message?.content;
       console.log("✅ Extracted content:", content);
 
       return NextResponse.json({ success: true, aiContent: content });
@@ -79,7 +52,6 @@ export async function GET() {
       inserted: 0,
       trends: [],
     });
-
   } catch (err) {
     console.error("Ingest API error:", err);
     return NextResponse.json({

@@ -45,12 +45,16 @@ export async function GET() {
       console.log("🔍 OpenAI raw response:", text);
 
       const contentType = openaiRes.headers.get("content-type") || "";
-      if (!contentType.includes("application/json")) {
-        return new Response(text, {
-          status: openaiRes.status,
-          headers: { 'Content-Type': 'text/html' },
-        });
-      }
+    const isHtml = text.trim().startsWith("<") || text.includes("<body");
+
+    if (!contentType.includes("application/json") || isHtml) {
+    console.warn("⚠️ OpenAI returned HTML instead of JSON.");
+    return new Response(text, {
+      status: openaiRes.status,
+      headers: { 'Content-Type': 'text/html' },
+    });
+}
+
 
       let aiData;
       try {

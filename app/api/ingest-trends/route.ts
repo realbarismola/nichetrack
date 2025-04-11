@@ -21,14 +21,14 @@ export async function GET() {
   }
 
   try {
-    // 1. Get Reddit trend
+    // 1. Get Reddit post title
     const redditRes = await fetch(redditUrl);
     const redditData = await redditRes.json();
     const posts = redditData.data.children.map((post: RedditPost) => post.data.title);
     const keyword = JSON.stringify(posts[0] || 'Default keyword').slice(1, -1);
     console.log("📰 First Reddit title:", keyword);
 
-    // 2. Create prompt
+    // 2. Create OpenAI prompt
     const prompt = `You are a trend researcher. Analyze this phrase and return a JSON object:\n\n- title: a short catchy trend title\n- description: what the trend is and why it’s interesting (1-2 sentences)\n- category: one of travel, health, finance, tech\n- ideas: 2 bullet content ideas (blog, YouTube, etc.)\n\nTrend keyword: "${keyword}"`;
 
     const payload = {
@@ -37,7 +37,7 @@ export async function GET() {
       temperature: 0.7,
     };
 
-    // 3. Call OpenAI
+    // 3. Request to OpenAI
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -50,14 +50,13 @@ export async function GET() {
 
     const status = res.status;
     const contentType = res.headers.get('content-type') || '';
-    const headers = Object.fromEntries(res.headers.entries());
     const bodyText = await res.text();
 
     console.log("📦 OpenAI response status:", status);
     console.log("📦 OpenAI content-type:", contentType);
     console.log("📄 OpenAI raw body (preview):", bodyText.slice(0, 300));
 
-    // 4. Handle non-JSON responses safely
+    // 4. Detect and handle HTML (non-JSON) response
     if (!contentType.includes('application/json')) {
       return NextResponse.json({
         success: false,
@@ -68,7 +67,7 @@ export async function GET() {
       }, { status });
     }
 
-    // 5. Parse and return content
+    // 5. Try to parse the response as JSON
     let aiData;
     try {
       aiData = JSON.parse(bodyText);

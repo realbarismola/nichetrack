@@ -23,7 +23,15 @@ export async function GET() {
     const posts = redditData.data.children.map((post: RedditPost) => post.data.title);
     console.log("🧵 Reddit posts fetched:", posts.length);
 
-    const newTrends: any[] = [];
+    type Trend = {
+      title: string;
+      description: string;
+      category: string;
+      ideas: string[];
+    };
+    
+    const newTrends: Trend[] = [];
+    
 
     for (const title of posts) {
       console.log(`⚡ Processing trend for: "${title}"`);

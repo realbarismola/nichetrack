@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
 
 const openaiApiKey = process.env.OPENAI_API_KEY;
 const redditUrl = 'https://www.reddit.com/r/Entrepreneur/top.json?limit=5&t=day';
@@ -22,8 +21,6 @@ export async function GET() {
     const redditRes = await fetch(redditUrl);
     const redditData = await redditRes.json();
     const posts = redditData.data.children.map((post: RedditPost) => post.data.title);
-
-    const newTrends = [];
 
     for (const title of posts) {
       const prompt = `You are a trend researcher. Analyze this phrase and return a JSON object:\n\n- title: a short catchy trend title\n- description: what the trend is and why it’s interesting (1-2 sentences)\n- category: one of travel, health, finance, tech\n- ideas: 2 bullet content ideas (blog, YouTube, etc.)\n\nTrend keyword: "${title}"`;
@@ -53,8 +50,8 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      inserted: newTrends.length,
-      trends: newTrends,
+      inserted: 0,
+      trends: [],
     });
 
   } catch (err) {

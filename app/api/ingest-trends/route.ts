@@ -44,56 +44,11 @@ export async function GET() {
       const text = await openaiRes.text();
       console.log("🔍 OpenAI raw response:", text);
 
-      const contentType = openaiRes.headers.get("content-type") || "";
-      const isHtml = text.trim().startsWith("<") || text.includes("<body");
-
-      if (!contentType.includes("application/json") || isHtml) {
-        console.warn("⚠️ OpenAI returned HTML instead of JSON.");
-        return new Response(text, {
-          status: openaiRes.status,
-          headers: { 'Content-Type': 'text/html' },
-        });
-      }
-
-      let aiData;
-      try {
-        aiData = JSON.parse(text);
-      } catch (err) {
-        console.error("❌ Failed to parse OpenAI response as JSON", err);
-        continue;
-      }
-
-      const content = aiData?.choices?.[0]?.message?.content;
-      if (!content) continue;
-
-      const cleaned = content
-        .replace(/^```json\n?/, '')
-        .replace(/^```/, '')
-        .replace(/```$/, '')
-        .trim();
-
-      let parsed;
-      try {
-        parsed = JSON.parse(cleaned);
-      } catch (err) {
-        console.error("❌ Failed to parse cleaned JSON", err);
-        continue;
-      }
-
-      const { error } = await supabase.from('trends').insert([
-        {
-          title: parsed.title,
-          description: parsed.description,
-          category: parsed.category,
-          ideas: parsed.ideas,
-        },
-      ]);
-
-      if (!error) {
-        newTrends.push(parsed);
-      } else {
-        console.error("❌ Supabase insert error:", error);
-      }
+      // 🚨 TEMPORARY: Force return OpenAI raw response to browser for debugging
+      return new Response(text, {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      });
     }
 
     return NextResponse.json({

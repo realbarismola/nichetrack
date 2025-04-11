@@ -21,16 +21,18 @@ export async function GET() {
   }
 
   try {
-    // 1. Fetch top Reddit post titles
-    const redditRes = await fetch(redditUrl);
+    // 1. Fetch Reddit titles
+    const redditRes = await fetch(redditUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    });
     const redditData = await redditRes.json();
-    const posts = redditData.data.children.map((post: RedditPost) => post.data.title);
-    const keyword = JSON.stringify(posts[0] || 'Default keyword').slice(1, -1);
+    const posts = redditData?.data?.children?.map((post: RedditPost) => post.data.title) || [];
+    const keyword = posts[0]?.replace(/"/g, "'") || 'emerging trends';
+
     console.log("📰 First Reddit title:", keyword);
 
     // 2. Create OpenAI prompt
     const prompt = `You are a trend researcher. Analyze this phrase and return a JSON object:\n\n- title: a short catchy trend title\n- description: what the trend is and why it’s interesting (1-2 sentences)\n- category: one of travel, health, finance, tech\n- ideas: 2 bullet content ideas (blog, YouTube, etc.)\n\nTrend keyword: "${keyword}"`;
-
 
     const payload = {
       model: 'gpt-3.5-turbo',
@@ -57,7 +59,7 @@ export async function GET() {
     console.log("📦 OpenAI headers:", headers);
     console.log("📄 OpenAI raw body:", bodyText);
 
-    // 4. Parse and return
+    // 4. Parse OpenAI response
     let aiData;
     try {
       aiData = JSON.parse(bodyText);

@@ -19,7 +19,7 @@ export async function GET() {
     OPENAI_PROJECT_ID: !!openaiProject,
   });
 
-  if (!openaiApiKey) {
+  if (!openaiApiKey || !openaiProject) {
     return NextResponse.json({ success: false, error: 'Missing OpenAI credentials in environment' });
   }
 

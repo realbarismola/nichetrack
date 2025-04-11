@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 
 const openaiApiKey = process.env.OPENAI_API_KEY;
-const openaiProject = process.env.OPENAI_PROJECT_ID;
-const openaiOrg = process.env.OPENAI_ORG_ID;
+const openaiOrg = process.env.OPENAI_ORG_ID; // Only this is needed if required
 const redditUrl = 'https://www.reddit.com/r/Entrepreneur/top.json?limit=5&t=day';
 
 type RedditPost = {
@@ -15,11 +14,10 @@ export async function GET() {
   console.log("✅ /api/ingest-trends route is alive!");
   console.log("🔐 ENV:", {
     OPENAI_API_KEY: !!openaiApiKey,
-    OPENAI_PROJECT_ID: !!openaiProject,
     OPENAI_ORG_ID: !!openaiOrg,
   });
 
-  if (!openaiApiKey || !openaiProject || !openaiOrg) {
+  if (!openaiApiKey) {
     return NextResponse.json({ success: false, error: 'Missing OpenAI credentials in environment' });
   }
 
@@ -36,8 +34,7 @@ export async function GET() {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${openaiApiKey}`,
-          'OpenAI-Project': openaiProject,
-          'OpenAI-Organization': openaiOrg,
+          ...(openaiOrg ? { 'OpenAI-Organization': openaiOrg } : {}),
         },
         body: JSON.stringify({
           model: 'gpt-3.5-turbo',

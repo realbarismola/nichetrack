@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 
 const openaiKey = process.env.OPENAI_API_KEY;
 const openaiOrg = process.env.OPENAI_ORG_ID;
-
 const redditUrl = 'https://www.reddit.com/r/Entrepreneur/top.json?limit=5&t=day';
 
 type RedditPost = {
@@ -22,15 +21,15 @@ export async function GET() {
   }
 
   try {
-    // 1. Get keyword from Reddit
+    // 1. Fetch Reddit posts
     const redditRes = await fetch(redditUrl);
     const redditData = await redditRes.json();
     const posts = redditData.data.children.map((post: RedditPost) => post.data.title);
-    const keyword = JSON.stringify(posts[0] || 'Default keyword').slice(1, -1);
-    console.log("📰 Reddit keyword:", keyword);
 
-    // 2. Prompt
-    const prompt = `You are a trend researcher. Analyze this phrase and return a JSON object:\n\n- title: a short catchy trend title\n- description: what the trend is and why it’s interesting (1-2 sentences)\n- category: one of travel, health, finance, tech\n- ideas: 2 bullet content ideas (blog, YouTube, etc.)\n\nTrend keyword: "${keyword}"`;
+    const keyword = (posts[0] || 'Default keyword').replace(/[\"<>]/g, '');
+    console.log("📰 First Reddit title:", keyword);
+
+    const prompt = `You are a trend researcher. Analyze this phrase and return a JSON object:\n\n- title: a short catchy trend title\n- description: what the trend is and why it’s interesting (1-2 sentences)\n- category: one of travel, health, finance, tech\n- ideas: 2 bullet content ideas (blog, YouTube, etc.)\n\nTrend keyword: \"${keyword}\"`;
 
     const payload = {
       model: 'gpt-3.5-turbo',
@@ -38,7 +37,6 @@ export async function GET() {
       temperature: 0.7,
     };
 
-    // 3. Call OpenAI
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -50,55 +48,21 @@ export async function GET() {
     });
 
     const status = res.status;
-    const contentType = res.headers.get('content-type') || '';
-    const bodyText = await res.text();
     const headers = Object.fromEntries(res.headers.entries());
+    const bodyText = await res.text();
 
-    console.log("📦 OpenAI response status:", status);
-    console.log("📦 OpenAI headers:", headers);
-    console.log("📄 OpenAI raw body:", bodyText.slice(0, 300));
-
-    // 4. Validate response type
-    if (!contentType.includes('application/json')) {
-      return NextResponse.json({
-        success: false,
-        error: 'Non-JSON response from OpenAI',
-        status,
-        preview: bodyText.slice(0, 300),
-        headers,
-      }, { status });
-    }
-
-    // 5. Try parse
-    let aiData;
-    try {
-      aiData = JSON.parse(bodyText);
-    } catch {
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to parse JSON from OpenAI',
-        status,
-        preview: bodyText.slice(0, 300),
-        headers,
-      }, { status });
-    }    
-    
-
-    const content = aiData?.choices?.[0]?.message?.content;
-    if (!content) {
-      return NextResponse.json({
-        success: false,
-        error: 'OpenAI returned no content',
-        status,
-        aiData,
-      }, { status });
-    }
+    console.log("📦 OpenAI Status:", status);
+    console.log("📄 Content-Type:", headers['content-type']);
+    console.log("📄 Body Preview:", bodyText.slice(0, 300));
 
     return NextResponse.json({
-      success: true,
-      promptUsed: prompt,
-      aiContent: content,
+      success: false,
+      note: 'Raw OpenAI response for debugging',
+      status,
+      headers,
+      preview: bodyText.slice(0, 300),
     }, { status });
+
   } catch (err) {
     console.error("❌ Ingest route error:", err);
     return NextResponse.json({

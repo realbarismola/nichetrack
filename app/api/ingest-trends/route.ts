@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
 import snoowrap from 'snoowrap'; // Import snoowrap
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 
 // --- Environment Variable Checks ---
 const openaiKey = process.env.OPENAI_API_KEY;
@@ -159,6 +166,22 @@ export async function GET() {
       try {
           const contentJson = JSON.parse(contentString);
           console.log("[OpenAI Response] Successfully parsed OpenAI JSON content.");
+          const { data, error } = await supabase.from('trends').insert([
+            {
+              title: contentJson.title,
+              description: contentJson.description,
+              category: contentJson.category,
+              ideas: contentJson.ideas,
+              source: 'reddit',
+              keyword: firstRedditTitle,
+            }
+          ]);
+          
+          if (error) {
+            console.error('❌ Supabase insert error:', error);
+          } else {
+            console.log('✅ Trend inserted into Supabase:', data);
+          }
           return NextResponse.json({ success: true, data: contentJson }, { status: 200 });
       } catch (contentParseError) {
           console.error("[OpenAI Response] Failed to parse content JSON within the 'message.content' field.");

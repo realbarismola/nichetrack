@@ -1,0 +1,9 @@
+{
+    "crons": [
+      {
+        "path": "/api/ingest-trends",
+        "schedule": "23 0 * * *"
+      }
+    ]
+  }
+  

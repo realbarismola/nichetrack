@@ -25,7 +25,12 @@ const userAgent = 'web:Nichetracker:v1.1 (contact: baris.mola@gmail.com)'; // <-
 //     title: string;
 // }
 
-export async function GET() {
+export async function GET(req: Request) {
+  // ✅ Cron job authorization check
+  if (req.headers.get('Authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+  console.log("✅ [/api/ingest-trends] Route execution started.");
   console.log("✅ [/api/ingest-trends] Route execution started.");
   console.log("🔐 ENV Check:");
   console.log(` - OPENAI_API_KEY set: ${!!openaiKey}`);

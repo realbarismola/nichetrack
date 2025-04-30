@@ -126,7 +126,7 @@ export async function GET(req: Request) {
 
       const contentJson = JSON.parse(contentString);
 
-      const { data, error: insertError } = await supabase.from('trends').insert([
+      const { error: insertError } = await supabase.from('trends').insert([
         {
           title: contentJson.title,
           description: contentJson.description,

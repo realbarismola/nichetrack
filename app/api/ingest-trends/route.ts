@@ -48,119 +48,113 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: false, error: 'Missing Reddit credentials.' }, { status: 500 });
   }
 
-  let firstRedditTitle = '';
-  let usedSubreddit = '';
+  const r = new snoowrap({
+    userAgent: userAgent,
+    clientId: redditClientId,
+    clientSecret: redditClientSecret,
+    username: redditUsername,
+    password: redditPassword,
+  });
 
-  try {
-    const r = new snoowrap({
-      userAgent: userAgent,
-      clientId: redditClientId,
-      clientSecret: redditClientSecret,
-      username: redditUsername,
-      password: redditPassword,
-    });
+  const subreddits = await getActiveSubreddits();
+  const insertedTrends = [];
+  const failedSubreddits = [];
 
-    const subreddits = await getActiveSubreddits();
+  for (const subreddit of subreddits) {
+    let redditTitle = '';
 
-    for (const subreddit of subreddits) {
-      try {
-        console.log(`[Reddit Fetch] Trying /r/${subreddit}...`);
-        const topPosts = await r.getSubreddit(subreddit).getTop({ time: 'day', limit: 5 });
+    try {
+      console.log(`[Reddit Fetch] Trying /r/${subreddit}...`);
+      const topPosts = await r.getSubreddit(subreddit).getTop({ time: 'day', limit: 5 });
+      const posts = topPosts.map((post) => post.title);
 
-        const posts = topPosts.map((post) => post.title);
-        if (posts.length > 0) {
-          const cleanTitle = posts[0].replace(/["<>]/g, '').trim();
-          if (cleanTitle) {
-            firstRedditTitle = cleanTitle;
-            usedSubreddit = subreddit;
-            break;
-          }
+      if (!posts.length) {
+        console.warn(`[Reddit Fetch] No posts found for /r/${subreddit}`);
+        failedSubreddits.push(subreddit);
+        continue;
+      }
+
+      redditTitle = posts[0].replace(/["<>]/g, '').trim();
+      if (!redditTitle) {
+        console.warn(`[Reddit Fetch] Empty or invalid title for /r/${subreddit}`);
+        failedSubreddits.push(subreddit);
+        continue;
+      }
+
+    } catch (err) {
+      console.warn(`[Reddit Fetch] Failed for /r/${subreddit}:`, err);
+      failedSubreddits.push(subreddit);
+      continue;
+    }
+
+    const prompt = `You are a trend researcher. Analyze this phrase and return ONLY a valid JSON object (no preamble, no explanation) with this exact structure:\n\n{\n  "title": "a short catchy trend title",\n  "description": "what the trend is and why it’s interesting (1-2 sentences)",\n  "category": "one of: travel, health, finance, tech",\n  "ideas": ["bullet point 1 (blog, YouTube, etc.)", "bullet point 2"]\n}\n\nTrend keyword: "${redditTitle}"`;
+
+    const payload = {
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+    };
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${openaiKey}`,
+      'User-Agent': userAgent,
+      ...(openaiOrg ? { 'OpenAI-Organization': openaiOrg } : {}),
+    };
+
+    try {
+      const response = await fetch(openAIUrl, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload),
+      });
+
+      const bodyText = await response.text();
+
+      if (!response.ok) {
+        console.error(`[OpenAI] Request failed for /r/${subreddit}: ${response.status}`);
+        continue;
+      }
+
+      const jsonResponse = JSON.parse(bodyText);
+      const contentString = jsonResponse.choices?.[0]?.message?.content;
+
+      if (!contentString) {
+        console.error(`[OpenAI] Missing content from response for /r/${subreddit}`);
+        continue;
+      }
+
+      const contentJson = JSON.parse(contentString);
+
+      const { data, error: insertError } = await supabase.from('trends').insert([
+        {
+          title: contentJson.title,
+          description: contentJson.description,
+          category: contentJson.category,
+          ideas: contentJson.ideas,
+          source: 'reddit',
+          keyword: redditTitle,
+          source_subreddit: subreddit,
         }
-      } catch (err) {
-        console.warn(`[Reddit Fetch] Error fetching from /r/${subreddit}:`, err);
+      ]);
+
+      if (insertError) {
+        console.error(`[Supabase] Insert error for /r/${subreddit}:`, insertError);
+        continue;
       }
+
+      console.log(`✅ Inserted trend from /r/${subreddit}`);
+      insertedTrends.push(subreddit);
+
+    } catch (err) {
+      console.error(`[OpenAI] Error during processing /r/${subreddit}:`, err);
+      continue;
     }
-
-    if (!firstRedditTitle) {
-      return NextResponse.json({
-        success: false,
-        error: 'No valid post found from any subreddit.'
-      }, { status: 500 });
-    }
-
-    console.log(`[Reddit Fetch] Using post from /r/${usedSubreddit}: "${firstRedditTitle}"`);
-
-  } catch (redditError: unknown) {
-    console.error("[Reddit Fetch/Auth] Authenticated fetch failed:", redditError);
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to authenticate or fetch Reddit data.',
-    }, { status: 502 });
   }
 
-  const prompt = `You are a trend researcher. Analyze this phrase and return ONLY a valid JSON object (no preamble, no explanation) with this exact structure:\n\n{\n  "title": "a short catchy trend title",\n  "description": "what the trend is and why it’s interesting (1-2 sentences)",\n  "category": "one of: travel, health, finance, tech",\n  "ideas": ["bullet point 1 (blog, YouTube, etc.)", "bullet point 2"]\n}\n\nTrend keyword: "${firstRedditTitle}"`;
-
-  const payload = {
-    model: 'gpt-3.5-turbo',
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.7,
-  };
-
-  const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${openaiKey}`,
-    'User-Agent': userAgent,
-    ...(openaiOrg ? { 'OpenAI-Organization': openaiOrg } : {}),
-  };
-
-  try {
-    const response = await fetch(openAIUrl, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(payload),
-    });
-
-    const bodyText = await response.text();
-
-    if (!response.ok) {
-      return NextResponse.json({
-        success: false,
-        error: `OpenAI API Error: ${response.status} ${response.statusText}`,
-        details: bodyText.slice(0, 500),
-      }, { status: 502 });
-    }
-
-    const jsonResponse = JSON.parse(bodyText);
-    const contentString = jsonResponse.choices?.[0]?.message?.content;
-
-    if (!contentString) {
-      return NextResponse.json({ success: false, error: 'Missing content from OpenAI response' }, { status: 500 });
-    }
-
-    const contentJson = JSON.parse(contentString);
-
-    const { data, error: insertError } = await supabase.from('trends').insert([
-      {
-        title: contentJson.title,
-        description: contentJson.description,
-        category: contentJson.category,
-        ideas: contentJson.ideas,
-        source: 'reddit',
-        keyword: firstRedditTitle,
-        source_subreddit: usedSubreddit,
-      }
-    ]);
-
-    if (insertError) {
-      console.error('❌ Supabase insert error:', insertError);
-      return NextResponse.json({ success: false, error: 'Failed to insert trend into Supabase' }, { status: 500 });
-    }
-
-    console.log('✅ Trend inserted:', data);
-    return NextResponse.json({ success: true, data: contentJson }, { status: 200 });
-
-  } catch (err) {
-    console.error('[OpenAI Request] Error:', err);
-    return NextResponse.json({ success: false, error: 'Error communicating with OpenAI' }, { status: 504 });
-  }
+  return NextResponse.json({
+    success: true,
+    inserted: insertedTrends,
+    failed: failedSubreddits,
+  });
 }

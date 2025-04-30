@@ -158,3 +158,7 @@ export async function GET(req: Request) {
     failed: failedSubreddits,
   });
 }
+
+export const config = {
+  runtime: 'nodejs',
+};

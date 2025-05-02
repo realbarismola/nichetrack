@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-import UserMenu from "@/components/UserMenu"; // 👈 import UserMenu
+import UserMenu from "@/components/UserMenu";
+import { UserProvider } from "@/app/context/UserProvider"; // 👈 Add this
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,8 +28,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <UserMenu /> {/* 👈 display the user menu */}
-        {children}
+        <UserProvider> {/* 👈 Wrap everything in provider */}
+          <UserMenu />
+          {children}
+        </UserProvider>
       </body>
     </html>
   );

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Sparkles } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
+import { startOfToday } from "date-fns";
 
 // Define TypeScript type for trend objects
 type Trend = {
@@ -25,7 +26,13 @@ export default function HomePage() {
   // Fetch trends from Supabase
   useEffect(() => {
     async function fetchTrends() {
-      const { data, error } = await supabase.from("trends").select("*");
+      const today = startOfToday().toISOString();
+      const { data, error } = await supabase
+        .from("trends")
+        .select("*")
+        .gte("created_at", today)
+        .order("created_at", { ascending: false });
+  
       console.log("Fetched trends:", data);
       if (error) {
         console.error("Error fetching trends:", error);
@@ -33,9 +40,10 @@ export default function HomePage() {
         setTrends(data);
       }
     }
-
+  
     fetchTrends();
   }, []);
+  
 
   // Filter trends based on search input and active tab
   const filteredTrends = trends.filter((trend) => {

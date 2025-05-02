@@ -54,7 +54,7 @@ export async function GET(req: Request) {
   const insertedTrends: string[] = [];
   const failedSubreddits: string[] = [];
 
-  const results = await Promise.allSettled(
+  await Promise.allSettled(
     subreddits.map(async (subreddit) => {
       try {
         console.log(`[Reddit Fetch] Trying /r/${subreddit}...`);

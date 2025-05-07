@@ -9,14 +9,15 @@ export default function HandleConfirmationPage() {
 
   useEffect(() => {
     const confirmSession = async () => {
-      const { error } = await (supabase.auth as any).getSessionFromUrl();      // should now work!
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.auth as any).getSessionFromUrl();
       if (!error) {
         router.push('/my-subreddits');
       }
     };
 
     confirmSession();
-  }, []);
+  }, [router]); // ✅ also fixes the dependency warning
 
   return <p className="text-center mt-20">Logging you in...</p>;
 }

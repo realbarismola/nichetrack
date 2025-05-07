@@ -2,7 +2,7 @@
 
 import { useUser } from '@/app/context/UserProvider';
 import { supabase } from '@/lib/supabaseClient';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
@@ -18,11 +18,7 @@ export default function MySubredditsPage() {
   const [newSubreddit, setNewSubreddit] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (user) fetchSubreddits();
-  }, [user]);
-
-  const fetchSubreddits = async () => {
+  const fetchSubreddits = useCallback(async () => {
     const { data, error } = await supabase
       .from('user_subreddits')
       .select('*')
@@ -34,7 +30,11 @@ export default function MySubredditsPage() {
     } else {
       setSubreddits(data || []);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user) fetchSubreddits();
+  }, [user, fetchSubreddits]);
 
   const handleAdd = async () => {
     if (!newSubreddit) return;

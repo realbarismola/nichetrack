@@ -12,17 +12,14 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
         router.push('/my-subreddits');
       }
-    });
-
-    return () => {
-      subscription.unsubscribe();
     };
+
+    checkSession();
   }, [router]);
 
   return (
@@ -33,7 +30,7 @@ export default function LoginPage() {
         appearance={{ theme: ThemeSupa }}
         providers={[]}
         theme="light"
-        redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL}/handle-confirmation`} // still needed for magic link signup
+        redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL}/handle-confirmation`}
       />
     </div>
   );

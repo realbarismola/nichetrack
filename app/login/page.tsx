@@ -15,8 +15,8 @@ export default function LoginPage() {
         appearance={{ theme: ThemeSupa }}
         providers={[]}
         theme="light"
+        redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL}/handle-confirmation`} // 👈 Redirect after login & signup
       />
     </div>
   );
 }
-// TestComment

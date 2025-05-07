@@ -2,11 +2,29 @@
 
 export const dynamic = 'force-dynamic';
 
+import { useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        router.push('/my-subreddits');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [router]);
+
   return (
     <div className="max-w-md mx-auto mt-20 p-6 border rounded-xl shadow-sm">
       <h1 className="text-2xl font-semibold mb-4 text-center">Log in or Sign up</h1>
@@ -15,7 +33,7 @@ export default function LoginPage() {
         appearance={{ theme: ThemeSupa }}
         providers={[]}
         theme="light"
-        redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL}/handle-confirmation`} // 👈 Redirect after login & signup
+        redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL}/handle-confirmation`} // still needed for magic link signup
       />
     </div>
   );

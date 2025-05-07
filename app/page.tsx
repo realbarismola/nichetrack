@@ -12,13 +12,13 @@ import { Sparkles } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { startOfToday } from "date-fns";
 
-// Define TypeScript type for trend objects
 type Trend = {
   id: number;
   title: string;
   description: string;
   category: string;
   ideas: string[];
+  subreddit: string; // 👈 must exist in your trends table
 };
 
 export default function HomePage() {
@@ -32,13 +32,47 @@ export default function HomePage() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setIsLoggedIn(!!session);
-    };
-    checkSession();
-  }, []);
 
-  // Fetch trends from Supabase
-  useEffect(() => {
-    async function fetchTrends() {
+      if (!session) {
+        fetchDefaultTrends();
+        return;
+      }
+
+      const { user } = session;
+
+      // Get user's selected subreddits
+      const { data: subreddits, error: subError } = await supabase
+        .from('user_subreddits')
+        .select('subreddit')
+        .eq('user_id', user.id);
+
+      if (subError || !subreddits || subreddits.length === 0) {
+        console.warn("No user subreddits found, falling back to defaults");
+        fetchDefaultTrends();
+        return;
+      }
+
+      const subredditList = subreddits.map(s => s.subreddit);
+
+      const today = startOfToday().toISOString();
+
+      // Fetch trends for selected subreddits
+      const { data: userTrends, error: trendError } = await supabase
+        .from("trends")
+        .select("*")
+        .gte("created_at", today)
+        .in("source_subreddit", subredditList)
+        .order("created_at", { ascending: false });
+
+      if (trendError) {
+        console.error("Error fetching user trends:", trendError);
+        fetchDefaultTrends();
+      } else {
+        setTrends(userTrends || []);
+      }
+    };
+
+    const fetchDefaultTrends = async () => {
       const today = startOfToday().toISOString();
       const { data, error } = await supabase
         .from("trends")
@@ -46,18 +80,16 @@ export default function HomePage() {
         .gte("created_at", today)
         .order("created_at", { ascending: false });
 
-      console.log("Fetched trends:", data);
       if (error) {
-        console.error("Error fetching trends:", error);
+        console.error("Error fetching fallback trends:", error);
       } else {
-        setTrends(data);
+        setTrends(data || []);
       }
-    }
+    };
 
-    fetchTrends();
+    checkSession();
   }, []);
 
-  // Filter trends based on search input and active tab
   const filteredTrends = trends.filter((trend) => {
     const matchesCategory = activeCategory === "all" || trend.category === activeCategory;
     const matchesSearch = trend.title.toLowerCase().includes(searchTerm.toLowerCase());
@@ -66,7 +98,6 @@ export default function HomePage() {
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
-      {/* Header */}
       <header className="text-center space-y-2">
         <h1 className="text-4xl font-bold">NicheTrack</h1>
         <p className="text-lg text-gray-600">
@@ -82,7 +113,6 @@ export default function HomePage() {
         )}
       </header>
 
-      {/* Search */}
       <section className="flex items-center gap-2">
         <Input
           placeholder="Search niches..."
@@ -93,7 +123,6 @@ export default function HomePage() {
         <Button>Search</Button>
       </section>
 
-      {/* Tabs */}
       <Tabs defaultValue="all" value={activeCategory} onValueChange={setActiveCategory}>
         <TabsList className="mb-4">
           <TabsTrigger value="all">All</TabsTrigger>

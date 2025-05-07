@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,16 @@ export default function HomePage() {
   const [trends, setTrends] = useState<Trend[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsLoggedIn(!!session);
+    };
+    checkSession();
+  }, []);
 
   // Fetch trends from Supabase
   useEffect(() => {
@@ -34,7 +45,7 @@ export default function HomePage() {
         .select("*")
         .gte("created_at", today)
         .order("created_at", { ascending: false });
-  
+
       console.log("Fetched trends:", data);
       if (error) {
         console.error("Error fetching trends:", error);
@@ -42,10 +53,9 @@ export default function HomePage() {
         setTrends(data);
       }
     }
-  
+
     fetchTrends();
   }, []);
-  
 
   // Filter trends based on search input and active tab
   const filteredTrends = trends.filter((trend) => {
@@ -59,7 +69,17 @@ export default function HomePage() {
       {/* Header */}
       <header className="text-center space-y-2">
         <h1 className="text-4xl font-bold">NicheTrack</h1>
-        <p className="text-lg text-gray-600">Discover emerging micro-niches before they go mainstream</p>
+        <p className="text-lg text-gray-600">
+          Discover emerging micro-niches before they go mainstream
+        </p>
+
+        {isLoggedIn && (
+          <div className="mt-4">
+            <Button onClick={() => router.push('/my-subreddits')}>
+              Go to My Subreddits
+            </Button>
+          </div>
+        )}
       </header>
 
       {/* Search */}

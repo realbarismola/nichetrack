@@ -1,5 +1,3 @@
-'use client';
-
 import { NextResponse } from 'next/server';
 import snoowrap from 'snoowrap';
 import { createClient } from '@supabase/supabase-js';

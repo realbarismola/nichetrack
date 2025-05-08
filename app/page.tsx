@@ -12,13 +12,13 @@ import { Sparkles } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { startOfToday } from "date-fns";
 
+// Define TypeScript type for trend objects
 type Trend = {
   id: number;
   title: string;
   description: string;
   category: string;
   ideas: string[];
-  subreddit: string; // 👈 must exist in your trends table
 };
 
 export default function HomePage() {
@@ -32,62 +32,42 @@ export default function HomePage() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setIsLoggedIn(!!session);
+    };
+    checkSession();
+  }, []);
+
+  useEffect(() => {
+    async function fetchTrends() {
+      const today = startOfToday().toISOString();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData.session;
 
       if (!session) {
-        fetchDefaultTrends();
+        const { data, error } = await supabase
+          .from("trends")
+          .select("*")
+          .gte("created_at", today)
+          .order("created_at", { ascending: false });
+
+        if (!error) setTrends(data || []);
         return;
       }
 
-      const { user } = session;
-
-      // Get user's selected subreddits
-      const { data: subreddits, error: subError } = await supabase
-        .from('user_subreddits')
-        .select('subreddit')
-        .eq('user_id', user.id);
-
-      if (subError || !subreddits || subreddits.length === 0) {
-        console.warn("No user subreddits found, falling back to defaults");
-        fetchDefaultTrends();
-        return;
-      }
-
-      const subredditList = subreddits.map(s => s.subreddit);
-
-      const today = startOfToday().toISOString();
-
-      // Fetch trends for selected subreddits
-      const { data: userTrends, error: trendError } = await supabase
-        .from("trends")
-        .select("*")
-        .gte("created_at", today)
-        .in("source_subreddit", subredditList)
-        .order("created_at", { ascending: false });
-
-      if (trendError) {
-        console.error("Error fetching user trends:", trendError);
-        fetchDefaultTrends();
-      } else {
-        setTrends(userTrends || []);
-      }
-    };
-
-    const fetchDefaultTrends = async () => {
-      const today = startOfToday().toISOString();
       const { data, error } = await supabase
-        .from("trends")
+        .from("user_trends")
         .select("*")
+        .eq("user_id", session.user.id)
         .gte("created_at", today)
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("Error fetching fallback trends:", error);
+        console.error("Error fetching user trends:", error);
       } else {
         setTrends(data || []);
       }
-    };
+    }
 
-    checkSession();
+    fetchTrends();
   }, []);
 
   const filteredTrends = trends.filter((trend) => {
@@ -103,7 +83,6 @@ export default function HomePage() {
         <p className="text-lg text-gray-600">
           Discover emerging micro-niches before they go mainstream
         </p>
-
         {isLoggedIn && (
           <div className="mt-4">
             <Button onClick={() => router.push('/my-subreddits')}>
@@ -133,28 +112,32 @@ export default function HomePage() {
         </TabsList>
 
         <TabsContent value={activeCategory}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTrends.map((trend) => (
-              <Card key={trend.id} className="hover:shadow-xl transition-shadow">
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <Sparkles className="h-4 w-4 text-yellow-500" />
-                    Trending
-                  </div>
-                  <h3 className="text-xl font-semibold">{trend.title}</h3>
-                  <p className="text-sm text-gray-600">{trend.description}</p>
-                  <ul className="text-sm list-disc pl-4 text-gray-500">
-                    {trend.ideas.map((idea, i) => (
-                      <li key={i}>{idea}</li>
-                    ))}
-                  </ul>
-                  <Button className="w-full mt-2" variant="outline">
-                    Save to Favorites
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {filteredTrends.length === 0 ? (
+            <p className="text-center text-gray-500">No trends found for your selected subreddits yet. Please check back later.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredTrends.map((trend) => (
+                <Card key={trend.id} className="hover:shadow-xl transition-shadow">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Sparkles className="h-4 w-4 text-yellow-500" />
+                      Trending
+                    </div>
+                    <h3 className="text-xl font-semibold">{trend.title}</h3>
+                    <p className="text-sm text-gray-600">{trend.description}</p>
+                    <ul className="text-sm list-disc pl-4 text-gray-500">
+                      {trend.ideas.map((idea, i) => (
+                        <li key={i}>{idea}</li>
+                      ))}
+                    </ul>
+                    <Button className="w-full mt-2" variant="outline">
+                      Save to Favorites
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

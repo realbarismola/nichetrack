@@ -19,6 +19,7 @@
 
 # production
 /build
+lib/supabaseServer.ts
 
 # misc
 .DS_Store

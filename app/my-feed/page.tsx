@@ -7,8 +7,20 @@ import { Badge } from '../../components/ui/badge';
 import { Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
+type Post = {
+  id: string;
+  user_id: string;
+  subreddit: string;
+  title: string;
+  url: string;
+  score: number;
+  num_comments: number;
+  created_utc: string;
+  created_at: string;
+};
+
 export default function UserFeedPage() {
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

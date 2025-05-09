@@ -65,7 +65,7 @@ export async function GET(req: Request) {
           score: post.score,
           num_comments: post.num_comments,
           created_utc: new Date(post.created_utc * 1000).toISOString(),
-          summary_text: null
+          summary: null
         }));
 
         const { error: insertError } = await supabase.from('user_posts').insert(postInserts);

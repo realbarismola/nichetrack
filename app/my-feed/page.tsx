@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Loader2, MessageSquare, ArrowUp } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -49,7 +50,12 @@ export default function UserFeedPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
-      <h1 className="text-3xl font-bold text-center">Your Feed</h1>
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl font-bold">Your Feed</h1>
+        <Button variant="outline" onClick={() => window.location.href = '/my-subreddits'}>
+          Manage Subreddits
+        </Button>
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-12">

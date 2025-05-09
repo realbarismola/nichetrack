@@ -13,8 +13,11 @@ export default function LoginPage() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session) {
         router.push('/my-feed');
       }
     };
@@ -43,7 +46,11 @@ export default function LoginPage() {
           appearance={{ theme: ThemeSupa }}
           providers={[]}
           theme="light"
-          redirectTo={typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined}
+          redirectTo={
+            typeof window !== 'undefined'
+              ? `${window.location.origin}/auth/callback`
+              : undefined
+          }
         />
       </div>
     </div>

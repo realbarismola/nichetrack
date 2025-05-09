@@ -25,7 +25,7 @@ export default function LoginPage() {
     checkSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (event) => {
         if (event === 'SIGNED_IN') {
           router.push('/my-feed');
         }

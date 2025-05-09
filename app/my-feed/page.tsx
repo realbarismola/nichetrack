@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, MessageSquare, ArrowUp } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type RedditPost = {
   id: string;
@@ -22,6 +23,8 @@ type RedditPost = {
 export default function UserFeedPage() {
   const [posts, setPosts] = useState<RedditPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [subreddits, setSubreddits] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState('all');
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -45,8 +48,30 @@ export default function UserFeedPage() {
       setLoading(false);
     };
 
+    const fetchSubreddits = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) return;
+
+      const { data, error } = await supabase
+        .from('user_subreddits')
+        .select('subreddit')
+        .eq('user_id', session.user.id);
+
+      if (!error && data) {
+        setSubreddits(data.map((item) => item.subreddit));
+      }
+    };
+
     fetchPosts();
+    fetchSubreddits();
   }, []);
+
+  const filteredPosts = activeTab === 'all'
+    ? posts
+    : posts.filter((post) => post.subreddit === activeTab);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
@@ -57,17 +82,30 @@ export default function UserFeedPage() {
         </Button>
       </div>
 
+      {subreddits.length > 0 && (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="mb-4 flex-wrap gap-2 justify-center">
+            <TabsTrigger value="all">All</TabsTrigger>
+            {subreddits.map((sub) => (
+              <TabsTrigger key={sub} value={sub} className="capitalize">
+                {sub}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="animate-spin h-6 w-6" />
         </div>
-      ) : posts.length === 0 ? (
+      ) : filteredPosts.length === 0 ? (
         <p className="text-center text-gray-600">
           No posts found. Try adding subreddits to track.
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {posts.map((post) => (
+          {filteredPosts.map((post) => (
             <Card key={post.id} className="hover:shadow-xl transition-shadow">
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center justify-between text-xs text-gray-500">

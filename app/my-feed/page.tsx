@@ -4,11 +4,22 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MessageSquare, ArrowUp } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
+type RedditPost = {
+  id: string;
+  user_id: string;
+  subreddit: string;
+  title: string;
+  url: string;
+  score: number;
+  num_comments: number;
+  created_utc: string;
+};
+
 export default function UserFeedPage() {
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<RedditPost[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,7 +52,7 @@ export default function UserFeedPage() {
       <h1 className="text-3xl font-bold text-center">Your Feed</h1>
 
       {loading ? (
-        <div className="flex justify-center py-10">
+        <div className="flex justify-center py-12">
           <Loader2 className="animate-spin h-6 w-6" />
         </div>
       ) : posts.length === 0 ? (
@@ -49,29 +60,33 @@ export default function UserFeedPage() {
           No posts found. Try adding subreddits to track.
         </p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {posts.map((post) => (
-            <Card key={post.id} className="hover:shadow-xl transition-shadow rounded-xl">
+            <Card key={post.id} className="hover:shadow-xl transition-shadow">
               <CardContent className="p-4 space-y-2">
-                <div className="flex items-center justify-between text-sm text-gray-500">
-                  <Badge className="lowercase bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
-                    {post.subreddit}
-                  </Badge>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <Badge>{post.subreddit}</Badge>
                   <span>
-                    {formatDistanceToNow(new Date(post.created_utc), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(post.created_utc), {
+                      addSuffix: true,
+                    })}
                   </span>
                 </div>
                 <a
                   href={post.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-base font-semibold hover:underline"
+                  className="text-base font-medium hover:underline block"
                 >
                   {post.title}
                 </a>
-                <div className="text-sm text-gray-500 flex gap-4">
-                  <span>💬 {post.num_comments}</span>
-                  <span>⬆️ {post.score}</span>
+                <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <MessageSquare className="w-4 h-4" /> {post.num_comments}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <ArrowUp className="w-4 h-4" /> {post.score}
+                  </span>
                 </div>
               </CardContent>
             </Card>

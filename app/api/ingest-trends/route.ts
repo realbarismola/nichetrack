@@ -57,7 +57,7 @@ export async function GET(req: Request) {
         console.log(`[Reddit Fetch] Fetching /r/${subreddit} for user ${user_id}`);
         const topPosts = await r.getSubreddit(subreddit).getTop({ time: 'day', limit: 5 });
 
-        const postInserts = topPosts.map(post => ({
+        const postInserts = topPosts.slice(0, 3).map(post => ({
           user_id,
           subreddit,
           title: post.title,

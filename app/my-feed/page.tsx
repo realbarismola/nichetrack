@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, MessageSquare, ArrowUp } from 'lucide-react';
+import { Loader2, MessageSquare, ArrowUp, Flame } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -126,11 +126,14 @@ export default function UserFeedPage() {
                 </a>
                 <div className="flex items-center gap-4 text-sm text-gray-500">
                   <span className="flex items-center gap-1">
-                    <MessageSquare className="w-4 h-4" /> {post.num_comments}
+                    <MessageSquare className="w-4 h-4" /> {post.num_comments} comments
                   </span>
                   <span className="flex items-center gap-1">
-                    <ArrowUp className="w-4 h-4" /> {post.score}
+                    <ArrowUp className="w-4 h-4" /> {post.score} upvotes
                   </span>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-yellow-600">
+                  <Flame className="w-4 h-4" /> Trending today in /r/{post.subreddit}
                 </div>
               </CardContent>
             </Card>

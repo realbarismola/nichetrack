@@ -13,28 +13,13 @@ export default function LoginPage() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (session) {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
         router.push('/my-feed');
       }
     };
 
     checkSession();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event) => {
-        if (event === 'SIGNED_IN') {
-          router.push('/my-feed');
-        }
-      }
-    );
-
-    return () => {
-      authListener?.subscription.unsubscribe();
-    };
   }, [router]);
 
   return (
@@ -48,7 +33,7 @@ export default function LoginPage() {
           theme="light"
           redirectTo={
             typeof window !== 'undefined'
-              ? `${window.location.origin}/auth/callback`
+              ? `${window.location.origin}/my-feed`
               : undefined
           }
         />

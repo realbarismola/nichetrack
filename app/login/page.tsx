@@ -18,8 +18,19 @@ export default function LoginPage() {
         router.push('/my-feed');
       }
     };
-
     checkSession();
+  }, [router]);
+
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        router.push('/my-feed');
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [router]);
 
   return (
@@ -31,11 +42,6 @@ export default function LoginPage() {
           appearance={{ theme: ThemeSupa }}
           providers={[]}
           theme="light"
-          redirectTo={
-            typeof window !== 'undefined'
-              ? `${window.location.origin}/my-feed`
-              : undefined
-          }
         />
       </div>
     </div>

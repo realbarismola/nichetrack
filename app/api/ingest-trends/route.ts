@@ -140,20 +140,34 @@ export async function GET(req: Request) {
         const topComments = await getTopComments(post);
         const summary = await generateSummary(post.title, topComments);
 
-        const { error: insertError } = await supabase.from('user_posts').insert([
-          {
-            user_id,
-            subreddit,
-            title: post.title,
-            url: post.url,
-            score: post.score,
-            num_comments: post.num_comments,
-            created_utc: new Date(post.created_utc * 1000).toISOString(),
-            summary,
-          },
-        ]);
+        const { data: inserted, error: insertError } = await supabase
+  .from('user_posts')
+  .insert([
+    {
+      user_id,
+      subreddit,
+      title: post.title,
+      url: post.url,
+      score: post.score,
+      num_comments: post.num_comments,
+      created_utc: new Date(post.created_utc * 1000).toISOString(),
+      summary: null, // insert first with null
+    },
+  ])
+  .select('id')
+  .single();
 
-        if (insertError) throw new Error(`Insert error: ${insertError.message}`);
+if (insertError || !inserted) throw new Error(`Insert error: ${insertError?.message}`);
+
+if (summary) {
+  const { error: updateError } = await supabase
+    .from('user_posts')
+    .update({ summary })
+    .eq('id', inserted.id);
+
+  if (updateError) throw new Error(`Update error: ${updateError.message}`);
+}
+
       }
 
       insertedPosts.push(subreddit);

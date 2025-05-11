@@ -33,17 +33,60 @@ async function getActiveSubreddits(): Promise<{ subreddit: string; user_id: stri
   return data;
 }
 
-async function getTopComments(post: snoowrap.Submission, limit = 3): Promise<string[]> {
-  const fullPost = await post.expandReplies({ limit, depth: 1 });
-  return (fullPost.comments as snoowrap.Comment[])
-    .filter((c) => 
-      typeof c.body === 'string' &&
-      !c.body.includes('[removed]') &&
-      c.author?.name !== 'AutoModerator'
+async function getTopComments(post: snoowrap.Submission, finalLimit = 3): Promise<string[]> {
+  // Fetch more comments than finalLimit to account for filtering
+  const fetchLimit = finalLimit * 2 + 10; // e.g., if finalLimit is 3, fetch 16
+
+  let commentsListing: snoowrap.Listing<snoowrap.Comment>;
+
+  try {
+    // This is the line (or the await of it) that causes ts(1062)
+    // We cast the promise to Promise<any> to break the TS inference cycle,
+    // then cast the resolved value back to the expected type.
+    const promise = post.expandReplies({ limit: fetchLimit, depth: 1 });
+    // Depth 1 is usually for fetching top-level comments and their immediate replies.
+    // If you strictly only want top-level comments, depth: 0 might be considered,
+    // but snoowrap's behavior with depth 0 on expandReplies for a submission needs careful checking.
+    // Depth 1 is generally safer for ensuring comments are loaded.
+
+    commentsListing = await (promise as Promise<any>) as snoowrap.Listing<snoowrap.Comment>;
+
+  } catch (error) {
+    console.error(`[getTopComments] Failed to expand replies for post ${post.id} (${post.title.slice(0,30)}...):`, error);
+    return []; // Return empty array if fetching/expanding comments fails
+  }
+
+  if (!commentsListing || commentsListing.length === 0) {
+    // console.log(`[getTopComments] No comments found or fetched for post ${post.id}`);
+    return [];
+  }
+
+  // A snoowrap.Listing can be treated as an array for .filter, .slice, .map
+  const formattedComments = commentsListing
+    .filter((c): c is snoowrap.Comment => // Type guard to ensure c is a valid Comment after filtering
+      Boolean( // Ensure the entire condition results in a boolean
+        c && // Check if comment object itself is not null/undefined
+        c.author && // Ensure author object exists before trying to access c.author.name
+        c.body && // Check if body exists
+        typeof c.body === 'string' &&
+        !c.body.toLowerCase().includes('[removed]') &&
+        !c.body.toLowerCase().includes('[deleted]') &&
+        c.author.name !== 'AutoModerator' && // No need for optional chaining if c.author is checked
+        c.body.trim() !== '' // Ensure comment is not just whitespace
+      )
     )
-    .slice(0, limit)
-    .map((c) => `- ${c.author.name}: ${c.body}`);
+    .slice(0, finalLimit) // Apply the final limit *after* filtering
+    .map((c: snoowrap.Comment) => { // c is now a valid, filtered snoowrap.Comment
+      const authorName = c.author.name; // Already checked c.author exists
+      // Sanitize comment body for the prompt: remove excessive newlines, limit length
+      const cleanBody = c.body.replace(/\n{2,}/g, ' ').replace(/\n/g, ' ').trim().slice(0, 200); // Limit comment length for prompt
+      return `- ${authorName}: ${cleanBody}${c.body.length > 200 ? '...' : ''}`;
+    });
+
+  return formattedComments;
 }
+
+
 
 async function generateSummary(title: string, comments: string[]): Promise<string | null> {
   const prompt = `

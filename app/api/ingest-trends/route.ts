@@ -48,7 +48,8 @@ async function getTopComments(post: snoowrap.Submission, finalLimit = 3): Promis
     // If you strictly only want top-level comments, depth: 0 might be considered,
     // but snoowrap's behavior with depth 0 on expandReplies for a submission needs careful checking.
     // Depth 1 is generally safer for ensuring comments are loaded.
-
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     commentsListing = await (promise as Promise<any>) as snoowrap.Listing<snoowrap.Comment>;
 
   } catch (error) {

@@ -51,12 +51,19 @@ async function getTopComments(post: snoowrap.Submission, finalLimit = 3): Promis
     return [];
   }
 
-  if (!Array.isArray(commentsListing) || commentsListing.length === 0) {
+  if (!commentsListing || typeof (commentsListing as any).map !== 'function') {
+    console.warn(`[getTopComments] Invalid commentsListing format for post ID ${post.id}.`);
+    return [];
+  }
+
+  const commentsArray = [...(commentsListing as snoowrap.Listing<snoowrap.Comment>)];
+
+  if (commentsArray.length === 0) {
     console.log(`[getTopComments] No comments found or fetched for post ID ${post.id}.`);
     return [];
   }
 
-  const formattedComments = commentsListing
+  const formattedComments = commentsArray
     .filter((c): c is snoowrap.Comment =>
       Boolean(
         c &&

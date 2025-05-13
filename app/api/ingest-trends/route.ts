@@ -151,7 +151,7 @@ ${comments.join('\n')}
     if (errorDetails !== null) {
       try {
         console.error("❌ [generateSummary] OpenAI API Error Details:", JSON.stringify(errorDetails, null, 2));
-      } catch (_stringifyError) { // Correctly prefixed with underscore
+      } catch { // Correctly prefixed with underscore
         console.error("❌ [generateSummary] Could not stringify OpenAI API Error Details. Raw details:", errorDetails);
       }
     } else if (!(error instanceof Error) && typeof error !== 'string') {

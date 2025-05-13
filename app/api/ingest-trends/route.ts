@@ -36,22 +36,22 @@ async function getActiveSubreddits(): Promise<{ subreddit: string; user_id: stri
 
 async function getTopComments(post: snoowrap.Submission, finalLimit = 3): Promise<string[]> {
   const fetchLimit = finalLimit * 2 + 10;
-  let commentsListing: snoowrap.Listing<snoowrap.Comment>;
-  console.log(`[getTopComments] Attempting to fetch up to ${fetchLimit} comments for post ID ${post.id} ("${post.title.slice(0,30)}...")`);
+  let commentsListing: unknown;
+
+  console.log(`[getTopComments] Attempting to fetch up to ${fetchLimit} comments for post ID ${post.id} ("${post.title.slice(0, 30)}...")`);
 
   try {
     const promise = post.expandReplies({ limit: fetchLimit, depth: 1 });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    commentsListing = await (promise as Promise<any>) as snoowrap.Listing<snoowrap.Comment>;
-    console.log(`[getTopComments] Fetched ${commentsListing?.length || 0} raw comments for post ID ${post.id}.`);
+    commentsListing = await (promise as Promise<unknown>);
+    console.log(`[getTopComments] Raw commentsListing type:`, typeof commentsListing);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`❌ [getTopComments] Failed to expand replies for post ID ${post.id} ("${post.title.slice(0,30)}..."):`, errorMessage);
+    console.error(`❌ [getTopComments] Failed to expand replies for post ID ${post.id} ("${post.title.slice(0, 30)}..."):`, errorMessage);
     if (error instanceof Error && error.stack) console.error("Stack:", error.stack);
     return [];
   }
 
-  if (!commentsListing || commentsListing.length === 0) {
+  if (!Array.isArray(commentsListing) || commentsListing.length === 0) {
     console.log(`[getTopComments] No comments found or fetched for post ID ${post.id}.`);
     return [];
   }
@@ -60,13 +60,14 @@ async function getTopComments(post: snoowrap.Submission, finalLimit = 3): Promis
     .filter((c): c is snoowrap.Comment =>
       Boolean(
         c &&
-        c.author &&
-        c.body &&
-        typeof c.body === 'string' &&
-        !c.body.toLowerCase().includes('[removed]') &&
-        !c.body.toLowerCase().includes('[deleted]') &&
-        c.author.name !== 'AutoModerator' &&
-        c.body.trim() !== ''
+        typeof c === 'object' &&
+        'author' in c &&
+        'body' in c &&
+        typeof (c as snoowrap.Comment).body === 'string' &&
+        !(c as snoowrap.Comment).body.toLowerCase().includes('[removed]') &&
+        !(c as snoowrap.Comment).body.toLowerCase().includes('[deleted]') &&
+        (c as snoowrap.Comment).body.trim() !== '' &&
+        (c as snoowrap.Comment).author?.name !== 'AutoModerator'
       )
     )
     .slice(0, finalLimit)

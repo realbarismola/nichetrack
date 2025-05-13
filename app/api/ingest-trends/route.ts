@@ -45,8 +45,6 @@ async function getTopComments(post: snoowrap.Submission, finalLimit = 3): Promis
     commentsListing = await (promise as Promise<any>) as snoowrap.Listing<snoowrap.Comment>;
     console.log(`[getTopComments] Fetched ${commentsListing?.length || 0} raw comments for post ID ${post.id}.`);
   } catch (error) {
-    // Note: This catch block might also benefit from the 'unknown' pattern if errors here are not always 'Error' instances.
-    // For now, assuming snoowrap throws standard Error objects or similar.
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`❌ [getTopComments] Failed to expand replies for post ID ${post.id} ("${post.title.slice(0,30)}..."):`, errorMessage);
     if (error instanceof Error && error.stack) console.error("Stack:", error.stack);
@@ -121,7 +119,7 @@ ${comments.join('\n')}
     }
   } catch (error: unknown) { // Changed to 'unknown'
     let errorMessage = 'An unknown error occurred during OpenAI API call';
-    let errorDetails: any = null; // Keep 'any' here for flexibility or define a more specific error structure if known
+    let errorDetails: unknown = null; // Changed from 'any' to 'unknown'
 
     if (error instanceof Error) {
       errorMessage = error.message;
@@ -131,22 +129,36 @@ ${comments.join('\n')}
 
     // Attempt to access response data if it looks like an Axios-style error
     if (typeof error === 'object' && error !== null) {
-      const potentialApiError = error as { response?: { data?: any; status?: number; }; message?: string };
-      if (potentialApiError.response && potentialApiError.response.data) {
-        errorDetails = potentialApiError.response.data;
+      // Asserting the structure we expect for potential API errors
+      const potentialApiError = error as {
+        response?: {
+          data?: unknown; // Changed from 'any' to 'unknown'
+          status?: number;
+        };
+        message?: string;
+      };
+
+      if (potentialApiError.response && typeof potentialApiError.response.data !== 'undefined') { // Check if data exists
+        errorDetails = potentialApiError.response.data; // Assign the unknown data
         if (potentialApiError.response.status) {
           errorMessage = `OpenAI API Error (Status ${potentialApiError.response.status}): ${errorMessage}`;
         }
       }
-      if (!errorMessage && potentialApiError.message) { // If 'message' exists directly
+      // If 'message' exists directly on the error object and wasn't caught by 'instanceof Error' or overridden by status message
+      if ((errorMessage === 'An unknown error occurred during OpenAI API call' || (error instanceof Error && errorMessage === error.message)) && potentialApiError.message) {
           errorMessage = potentialApiError.message;
       }
     }
 
     console.error(`❌ [generateSummary] Error calling OpenAI API for title "${title.slice(0,50)}...":`, errorMessage);
-    if (errorDetails) {
-      console.error("❌ [generateSummary] OpenAI API Error Details:", JSON.stringify(errorDetails, null, 2));
-    } else if (!(error instanceof Error) && typeof error !== 'string') { // Log raw if not Error or string
+    if (errorDetails !== null) { // Check if errorDetails was assigned
+      // Stringify unknown data for logging
+      try {
+        console.error("❌ [generateSummary] OpenAI API Error Details:", JSON.stringify(errorDetails, null, 2));
+      } catch (stringifyError) {
+        console.error("❌ [generateSummary] Could not stringify OpenAI API Error Details. Raw details:", errorDetails);
+      }
+    } else if (!(error instanceof Error) && typeof error !== 'string') { // Log raw if not Error or string and no specific details found
         console.error("❌ [generateSummary] Raw error object:", error);
     }
     return null;
@@ -272,7 +284,7 @@ export async function GET(req: Request) {
       console.warn(`❌ [Main Loop Error] Failed processing /r/${subreddit} for user ${user_id}:`, errorMessage);
       if (errorStack) {
           console.warn("Stack trace:", errorStack);
-      } else if (!(err instanceof Error) && typeof err !== 'string') { // Log raw if not Error or string
+      } else if (!(err instanceof Error) && typeof err !== 'string') {
           console.warn("Raw error object for subreddit processing:", err);
       }
 

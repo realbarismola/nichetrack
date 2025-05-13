@@ -45,7 +45,11 @@ async function getTopComments(post: snoowrap.Submission, finalLimit = 3): Promis
     commentsListing = await (promise as Promise<any>) as snoowrap.Listing<snoowrap.Comment>;
     console.log(`[getTopComments] Fetched ${commentsListing?.length || 0} raw comments for post ID ${post.id}.`);
   } catch (error) {
-    console.error(`❌ [getTopComments] Failed to expand replies for post ID ${post.id} ("${post.title.slice(0,30)}..."):`, error);
+    // Note: This catch block might also benefit from the 'unknown' pattern if errors here are not always 'Error' instances.
+    // For now, assuming snoowrap throws standard Error objects or similar.
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`❌ [getTopComments] Failed to expand replies for post ID ${post.id} ("${post.title.slice(0,30)}..."):`, errorMessage);
+    if (error instanceof Error && error.stack) console.error("Stack:", error.stack);
     return [];
   }
 
@@ -79,7 +83,7 @@ async function getTopComments(post: snoowrap.Submission, finalLimit = 3): Promis
 }
 
 async function generateSummary(title: string, comments: string[]): Promise<string | null> {
-  if (!comments || comments.length === 0) { // Added !comments check for safety
+  if (!comments || comments.length === 0) {
     console.log(`[generateSummary] No comments provided for title "${title.slice(0,50)}...". Skipping summary generation.`);
     return null;
   }
@@ -115,10 +119,35 @@ ${comments.join('\n')}
       console.log(`[generateSummary] OpenAI response did not contain expected content structure for title "${title.slice(0,50)}...". Full response choice:`, JSON.stringify(response.choices[0], null, 2));
       return null;
     }
-  } catch (error: any) { // Catching as any to access error.response.data if it's an API error
-    console.error(`❌ [generateSummary] Error calling OpenAI API for title "${title.slice(0,50)}...":`, error.message);
-    if (error.response && error.response.data) {
-      console.error("❌ [generateSummary] OpenAI API Error Details:", error.response.data);
+  } catch (error: unknown) { // Changed to 'unknown'
+    let errorMessage = 'An unknown error occurred during OpenAI API call';
+    let errorDetails: any = null; // Keep 'any' here for flexibility or define a more specific error structure if known
+
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
+
+    // Attempt to access response data if it looks like an Axios-style error
+    if (typeof error === 'object' && error !== null) {
+      const potentialApiError = error as { response?: { data?: any; status?: number; }; message?: string };
+      if (potentialApiError.response && potentialApiError.response.data) {
+        errorDetails = potentialApiError.response.data;
+        if (potentialApiError.response.status) {
+          errorMessage = `OpenAI API Error (Status ${potentialApiError.response.status}): ${errorMessage}`;
+        }
+      }
+      if (!errorMessage && potentialApiError.message) { // If 'message' exists directly
+          errorMessage = potentialApiError.message;
+      }
+    }
+
+    console.error(`❌ [generateSummary] Error calling OpenAI API for title "${title.slice(0,50)}...":`, errorMessage);
+    if (errorDetails) {
+      console.error("❌ [generateSummary] OpenAI API Error Details:", JSON.stringify(errorDetails, null, 2));
+    } else if (!(error instanceof Error) && typeof error !== 'string') { // Log raw if not Error or string
+        console.error("❌ [generateSummary] Raw error object:", error);
     }
     return null;
   }
@@ -146,7 +175,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: false, error: 'Missing Supabase credentials.' }, { status: 500 });
   }
 
-
   console.log('🔧 [/api/ingest-trends] Initializing Reddit client (snoowrap)...');
   const r = new snoowrap({
     userAgent,
@@ -172,18 +200,18 @@ export async function GET(req: Request) {
   for (const { subreddit, user_id } of userSubreddits) {
     try {
       console.log(`🔄 [Main Loop] Processing /r/${subreddit} for user ${user_id}`);
-      const topPostsFromReddit = await r.getSubreddit(subreddit).getTop({ time: 'day', limit: 5 }); // Fetch 5, process 3
+      const topPostsFromReddit = await r.getSubreddit(subreddit).getTop({ time: 'day', limit: 5 });
       console.log(`🔍 [Main Loop] Fetched ${topPostsFromReddit.length} top posts from /r/${subreddit}.`);
 
       if (!insertedPostTitlesForSubreddits[subreddit]) {
         insertedPostTitlesForSubreddits[subreddit] = [];
       }
 
-      for (const post of topPostsFromReddit.slice(0, 3)) { // Process up to 3 posts
+      for (const post of topPostsFromReddit.slice(0, 3)) {
         totalPostsProcessed++;
         console.log(`📄 [Main Loop] Processing post: "${post.title.slice(0,70)}..." (ID: ${post.id}) from /r/${subreddit}`);
 
-        const topComments = await getTopComments(post, 3); // Get up to 3 comments
+        const topComments = await getTopComments(post, 3);
         console.log(`💬 [Main Loop] For post "${post.title.slice(0,50)}...", got ${topComments.length} formatted top comments.`);
 
         const summary = await generateSummary(post.title, topComments);
@@ -200,7 +228,7 @@ export async function GET(req: Request) {
               score: post.score,
               num_comments: post.num_comments,
               created_utc: new Date(post.created_utc * 1000).toISOString(),
-              summary: null, // Insert with null first
+              summary: null,
             },
           ])
           .select('id')
@@ -208,7 +236,6 @@ export async function GET(req: Request) {
 
         if (insertError || !insertedRecord) {
           console.error(`❌ [DB Insert] Failed for post "${post.title.slice(0,50)}..." of /r/${subreddit}:`, insertError?.message || 'No data returned from insert');
-          // Continue to next post, don't throw to let other posts/subreddits process
           continue;
         }
         console.log(`✅ [DB Insert] Successfully inserted post, new record ID: ${insertedRecord.id}`);
@@ -223,7 +250,6 @@ export async function GET(req: Request) {
 
           if (updateError) {
             console.error(`❌ [DB Update] Failed for post ID ${insertedRecord.id}:`, updateError.message);
-            // Log error but continue
           } else {
             console.log(`✅ [DB Update] Successfully updated post ID ${insertedRecord.id} with summary.`);
           }
@@ -232,8 +258,24 @@ export async function GET(req: Request) {
         }
         insertedPostTitlesForSubreddits[subreddit].push(post.title.slice(0, 50) + '...');
       }
-    } catch (err: any) {
-      console.warn(`❌ [Main Loop Error] Failed processing /r/${subreddit} for user ${user_id}:`, err.message, err.stack);
+    } catch (err: unknown) { // Changed to 'unknown'
+      let errorMessage = `An unknown error occurred during processing /r/${subreddit} for user ${user_id}`;
+      let errorStack: string | undefined = undefined;
+
+      if (err instanceof Error) {
+        errorMessage = err.message;
+        errorStack = err.stack;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+
+      console.warn(`❌ [Main Loop Error] Failed processing /r/${subreddit} for user ${user_id}:`, errorMessage);
+      if (errorStack) {
+          console.warn("Stack trace:", errorStack);
+      } else if (!(err instanceof Error) && typeof err !== 'string') { // Log raw if not Error or string
+          console.warn("Raw error object for subreddit processing:", err);
+      }
+
       if (!failedSubredditsProcessing.includes(subreddit)) {
         failedSubredditsProcessing.push(subreddit);
       }
@@ -256,5 +298,5 @@ export async function GET(req: Request) {
 }
 
 export const config = {
-  runtime: 'nodejs', // Ensure this is correct for Vercel serverless functions
+  runtime: 'nodejs',
 };

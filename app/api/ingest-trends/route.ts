@@ -125,7 +125,7 @@ ${comments.join('\n')}
   console.log(`[generateSummary] Generating summary for title "${title.slice(0,50)}..." with ${comments.length} comments.`);
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4', // Consider 'gpt-3.5-turbo' for cost/speed
+      model: 'gpt-3.5-turbo', // Consider 'gpt-3.5-turbo' for cost/speed
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
     });

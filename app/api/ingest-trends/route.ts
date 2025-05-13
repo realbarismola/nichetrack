@@ -117,9 +117,9 @@ ${comments.join('\n')}
       console.log(`[generateSummary] OpenAI response did not contain expected content structure for title "${title.slice(0,50)}...". Full response choice:`, JSON.stringify(response.choices[0], null, 2));
       return null;
     }
-  } catch (error: unknown) { // Changed to 'unknown'
+  } catch (error: unknown) {
     let errorMessage = 'An unknown error occurred during OpenAI API call';
-    let errorDetails: unknown = null; // Changed from 'any' to 'unknown'
+    let errorDetails: unknown = null;
 
     if (error instanceof Error) {
       errorMessage = error.message;
@@ -127,38 +127,34 @@ ${comments.join('\n')}
       errorMessage = error;
     }
 
-    // Attempt to access response data if it looks like an Axios-style error
     if (typeof error === 'object' && error !== null) {
-      // Asserting the structure we expect for potential API errors
       const potentialApiError = error as {
         response?: {
-          data?: unknown; // Changed from 'any' to 'unknown'
+          data?: unknown;
           status?: number;
         };
         message?: string;
       };
 
-      if (potentialApiError.response && typeof potentialApiError.response.data !== 'undefined') { // Check if data exists
-        errorDetails = potentialApiError.response.data; // Assign the unknown data
+      if (potentialApiError.response && typeof potentialApiError.response.data !== 'undefined') {
+        errorDetails = potentialApiError.response.data;
         if (potentialApiError.response.status) {
           errorMessage = `OpenAI API Error (Status ${potentialApiError.response.status}): ${errorMessage}`;
         }
       }
-      // If 'message' exists directly on the error object and wasn't caught by 'instanceof Error' or overridden by status message
       if ((errorMessage === 'An unknown error occurred during OpenAI API call' || (error instanceof Error && errorMessage === error.message)) && potentialApiError.message) {
           errorMessage = potentialApiError.message;
       }
     }
 
     console.error(`❌ [generateSummary] Error calling OpenAI API for title "${title.slice(0,50)}...":`, errorMessage);
-    if (errorDetails !== null) { // Check if errorDetails was assigned
-      // Stringify unknown data for logging
+    if (errorDetails !== null) {
       try {
         console.error("❌ [generateSummary] OpenAI API Error Details:", JSON.stringify(errorDetails, null, 2));
-      } catch (stringifyError) {
+      } catch (_stringifyError) { // Prefixed with underscore
         console.error("❌ [generateSummary] Could not stringify OpenAI API Error Details. Raw details:", errorDetails);
       }
-    } else if (!(error instanceof Error) && typeof error !== 'string') { // Log raw if not Error or string and no specific details found
+    } else if (!(error instanceof Error) && typeof error !== 'string') {
         console.error("❌ [generateSummary] Raw error object:", error);
     }
     return null;
@@ -270,7 +266,7 @@ export async function GET(req: Request) {
         }
         insertedPostTitlesForSubreddits[subreddit].push(post.title.slice(0, 50) + '...');
       }
-    } catch (err: unknown) { // Changed to 'unknown'
+    } catch (err: unknown) {
       let errorMessage = `An unknown error occurred during processing /r/${subreddit} for user ${user_id}`;
       let errorStack: string | undefined = undefined;
 

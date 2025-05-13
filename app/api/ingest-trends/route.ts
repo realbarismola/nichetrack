@@ -36,63 +36,69 @@ async function getActiveSubreddits(): Promise<{ subreddit: string; user_id: stri
 
 async function getTopComments(post: snoowrap.Submission, finalLimit = 3): Promise<string[]> {
   const fetchLimit = finalLimit * 2 + 10;
-  let commentsToListingOrArray: snoowrap.Listing<snoowrap.Comment> | snoowrap.Comment[] = []; // Initialize as empty array
+  let commentsToListingOrArray: snoowrap.Listing<snoowrap.Comment> | snoowrap.Comment[] = [];
 
   console.log(`[getTopComments] Attempting to fetch up to ${fetchLimit} comments for post ID ${post.id} ("${post.title.slice(0, 30)}...")`);
 
   try {
-    // Apply the fix for ts(1062)
     const promise = post.expandReplies({ limit: fetchLimit, depth: 1 });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const resultFromExpandReplies: any = await (promise as Promise<any>);
 
     console.log(`[getTopComments] Raw resultFromExpandReplies type:`, typeof resultFromExpandReplies);
-    // A snoowrap.Listing is array-like and should have a .length property.
-    // It's the direct result of expandReplies.
-    if (resultFromExpandReplies && typeof resultFromExpandReplies.length === 'number') {
-        // If it looks like a Listing (array-like), use it directly.
+
+    if (resultFromExpandReplies && typeof resultFromExpandReplies.length === 'number') { // Check if it's array-like (like a Listing)
         commentsToListingOrArray = resultFromExpandReplies as snoowrap.Listing<snoowrap.Comment>;
         console.log(`[getTopComments] resultFromExpandReplies treated as Listing, length: ${commentsToListingOrArray.length}`);
-    } else if (resultFromExpandReplies && typeof resultFromExpandReplies === 'object' && 'comments' in resultFromExpandReplies && Array.isArray((resultFromExpandReplies as any).comments)) {
-        // Fallback: If it's an object with a 'comments' array property (less common for direct expandReplies result)
-        commentsToListingOrArray = (resultFromExpandReplies as { comments: snoowrap.Comment[] }).comments;
-        console.warn(`[getTopComments] resultFromExpandReplies was an object with a 'comments' array property. Using that. Length: ${commentsToListingOrArray.length}`);
+    } else if (
+        resultFromExpandReplies &&
+        typeof resultFromExpandReplies === 'object' &&
+        resultFromExpandReplies !== null && // ensure it's not null before 'in' operator
+        'comments' in resultFromExpandReplies
+    ) {
+        // If 'comments' property exists, now check if it's an array
+        const potentialObjectWithComments = resultFromExpandReplies as { comments?: unknown }; // More specific assertion
+        if (Array.isArray(potentialObjectWithComments.comments)) {
+            commentsToListingOrArray = potentialObjectWithComments.comments as snoowrap.Comment[];
+            console.warn(`[getTopComments] resultFromExpandReplies was an object with a 'comments' array property. Using that. Length: ${commentsToListingOrArray.length}`);
+        } else {
+            console.warn(`[getTopComments] resultFromExpandReplies had a 'comments' property but it was not an array. Comments property:`, potentialObjectWithComments.comments);
+            // commentsToListingOrArray remains empty if .comments is not an array
+        }
     } else {
         console.warn(`[getTopComments] resultFromExpandReplies for post ${post.id} is not a recognized Listing or object with comments. Result:`, JSON.stringify(resultFromExpandReplies));
-        // commentsToListingOrArray remains an empty array
+        // commentsToListingOrArray remains empty
     }
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`❌ [getTopComments] Failed to expand replies for post ID ${post.id} ("${post.title.slice(0, 30)}..."):`, errorMessage);
     if (error instanceof Error && error.stack) console.error("Stack:", error.stack);
-    return []; // Return empty array on error
+    return [];
   }
 
-  // At this point, commentsToListingOrArray is either a snoowrap.Listing or an array of snoowrap.Comment, or an empty array.
-  // Both can be used with .filter, .slice, .map.
   if (!commentsToListingOrArray || commentsToListingOrArray.length === 0) {
     console.log(`[getTopComments] No processable comments found or fetched for post ID ${post.id}.`);
     return [];
   }
 
-  const formattedComments = (commentsToListingOrArray as Array<snoowrap.Comment | undefined | null>) // Cast to allow for potential undefined/null before filtering
-    .filter((c): c is snoowrap.Comment => // Type guard is crucial
+  const formattedComments = (commentsToListingOrArray as Array<snoowrap.Comment | undefined | null>)
+    .filter((c): c is snoowrap.Comment =>
       Boolean(
-        c && // Ensure c is not null/undefined
-        typeof c === 'object' && // Ensure c is an object
-        c.author && // Ensure author property exists and is truthy
-        c.body && // Ensure body property exists and is truthy
+        c &&
+        typeof c === 'object' &&
+        c.author &&
+        c.body &&
         typeof c.body === 'string' &&
         !c.body.toLowerCase().includes('[removed]') &&
         !c.body.toLowerCase().includes('[deleted]') &&
         c.body.trim() !== '' &&
-        c.author.name !== 'AutoModerator' // c.author.name is safe due to previous c.author check
+        c.author.name !== 'AutoModerator'
       )
     )
     .slice(0, finalLimit)
-    .map((c: snoowrap.Comment) => { // c is now guaranteed to be a snoowrap.Comment
-      const authorName = c.author.name; // Safe to access
+    .map((c: snoowrap.Comment) => {
+      const authorName = c.author.name;
       const cleanBody = c.body.replace(/\n{2,}/g, ' ').replace(/\n/g, ' ').trim().slice(0, 200);
       return `- ${authorName}: ${cleanBody}${c.body.length > 200 ? '...' : ''}`;
     });

@@ -47,27 +47,24 @@ async function getTopComments(post: snoowrap.Submission, finalLimit = 3): Promis
 
     console.log(`[getTopComments] Raw resultFromExpandReplies type:`, typeof resultFromExpandReplies);
 
-    if (resultFromExpandReplies && typeof resultFromExpandReplies.length === 'number') { // Check if it's array-like (like a Listing)
+    if (resultFromExpandReplies && typeof resultFromExpandReplies.length === 'number') { 
         commentsToListingOrArray = resultFromExpandReplies as snoowrap.Listing<snoowrap.Comment>;
         console.log(`[getTopComments] resultFromExpandReplies treated as Listing, length: ${commentsToListingOrArray.length}`);
     } else if (
         resultFromExpandReplies &&
         typeof resultFromExpandReplies === 'object' &&
-        resultFromExpandReplies !== null && // ensure it's not null before 'in' operator
+        resultFromExpandReplies !== null && 
         'comments' in resultFromExpandReplies
     ) {
-        // If 'comments' property exists, now check if it's an array
-        const potentialObjectWithComments = resultFromExpandReplies as { comments?: unknown }; // More specific assertion
+        const potentialObjectWithComments = resultFromExpandReplies as { comments?: unknown }; 
         if (Array.isArray(potentialObjectWithComments.comments)) {
             commentsToListingOrArray = potentialObjectWithComments.comments as snoowrap.Comment[];
             console.warn(`[getTopComments] resultFromExpandReplies was an object with a 'comments' array property. Using that. Length: ${commentsToListingOrArray.length}`);
         } else {
             console.warn(`[getTopComments] resultFromExpandReplies had a 'comments' property but it was not an array. Comments property:`, potentialObjectWithComments.comments);
-            // commentsToListingOrArray remains empty if .comments is not an array
         }
     } else {
         console.warn(`[getTopComments] resultFromExpandReplies for post ${post.id} is not a recognized Listing or object with comments. Result:`, JSON.stringify(resultFromExpandReplies));
-        // commentsToListingOrArray remains empty
     }
 
   } catch (error) {
@@ -107,6 +104,7 @@ async function getTopComments(post: snoowrap.Submission, finalLimit = 3): Promis
   return formattedComments;
 }
 
+
 async function generateSummary(title: string, comments: string[]): Promise<string | null> {
   if (!comments || comments.length === 0) {
     console.log(`[generateSummary] No comments provided for title "${title.slice(0,50)}...". Skipping summary generation.`);
@@ -125,7 +123,7 @@ ${comments.join('\n')}
   console.log(`[generateSummary] Generating summary for title "${title.slice(0,50)}..." with ${comments.length} comments.`);
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo', // Consider 'gpt-3.5-turbo' for cost/speed
+      model: 'gpt-3.5-turbo', // Switched to gpt-3.5-turbo
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
     });
@@ -178,7 +176,7 @@ ${comments.join('\n')}
     if (errorDetails !== null) {
       try {
         console.error("❌ [generateSummary] OpenAI API Error Details:", JSON.stringify(errorDetails, null, 2));
-      } catch { // Correctly prefixed with underscore
+      } catch (_stringifyError) { 
         console.error("❌ [generateSummary] Could not stringify OpenAI API Error Details. Raw details:", errorDetails);
       }
     } else if (!(error instanceof Error) && typeof error !== 'string') {
@@ -187,6 +185,8 @@ ${comments.join('\n')}
     return null;
   }
 }
+// --- END OF HELPER FUNCTIONS ---
+
 
 export async function GET(req: Request) {
   console.log('🚀 [/api/ingest-trends] CRON Job Invocation Received.');
@@ -197,6 +197,7 @@ export async function GET(req: Request) {
 
   console.log('✅ [/api/ingest-trends] Authorization successful. Route execution started.');
 
+  // --- Start: Credential Checks ---
   if (!redditClientId || !redditClientSecret || !redditUsername || !redditPassword) {
     console.error('❌ [/api/ingest-trends] Missing Reddit credentials.');
     return NextResponse.json({ success: false, error: 'Missing Reddit credentials.' }, { status: 500 });
@@ -209,6 +210,7 @@ export async function GET(req: Request) {
     console.error('❌ [/api/ingest-trends] Missing Supabase credentials.');
     return NextResponse.json({ success: false, error: 'Missing Supabase credentials.' }, { status: 500 });
   }
+  // --- End: Credential Checks ---
 
   console.log('🔧 [/api/ingest-trends] Initializing Reddit client (snoowrap)...');
   const r = new snoowrap({
@@ -223,7 +225,7 @@ export async function GET(req: Request) {
   const userSubreddits = await getActiveSubreddits();
   if (userSubreddits.length === 0) {
     console.log('ℹ️ [/api/ingest-trends] No active subreddits found to process. Exiting.');
-    return NextResponse.json({ success: true, message: "No active subreddits to process.", inserted: [], failed: [] });
+    return NextResponse.json({ success: true, message: "No active subreddits to process.", postsIngestedBySubreddit: {}, failedSubreddits: [] });
   }
 
   const insertedPostTitlesForSubreddits: Record<string, string[]> = {};
@@ -231,22 +233,32 @@ export async function GET(req: Request) {
   let totalPostsProcessed = 0;
   let totalSummariesGenerated = 0;
 
-  console.log(`⏳ [/api/ingest-trends] Starting processing for ${userSubreddits.length} user-subreddit pairs.`);
+  console.log(`⏳ [/api/ingest-trends] Starting processing for ${userSubreddits.length} user-subreddit pairs. (1 top post per subreddit)`);
   for (const { subreddit, user_id } of userSubreddits) {
     try {
       console.log(`🔄 [Main Loop] Processing /r/${subreddit} for user ${user_id}`);
-      const topPostsFromReddit = await r.getSubreddit(subreddit).getTop({ time: 'day', limit: 5 });
-      console.log(`🔍 [Main Loop] Fetched ${topPostsFromReddit.length} top posts from /r/${subreddit}.`);
+      // Fetch only 1 top post
+      const topPostsFromReddit = await r.getSubreddit(subreddit).getTop({ time: 'day', limit: 1 });
+      console.log(`🔍 [Main Loop] Fetched ${topPostsFromReddit?.length || 0} top post(s) from /r/${subreddit}.`);
 
       if (!insertedPostTitlesForSubreddits[subreddit]) {
         insertedPostTitlesForSubreddits[subreddit] = [];
       }
 
-      for (const post of topPostsFromReddit.slice(0, 3)) {
+      // Check if any post was returned and if topPostsFromReddit is not null/undefined
+      if (topPostsFromReddit && topPostsFromReddit.length > 0) {
+        const post = topPostsFromReddit[0]; // Get the single top post
+
+        // Additional check to ensure 'post' is a valid Submission object
+        if (!post || typeof post.title === 'undefined') {
+            console.warn(`[Main Loop] Invalid post object received for /r/${subreddit}. Skipping.`);
+            continue;
+        }
+
         totalPostsProcessed++;
         console.log(`📄 [Main Loop] Processing post: "${post.title.slice(0,70)}..." (ID: ${post.id}) from /r/${subreddit}`);
 
-        const topComments = await getTopComments(post, 3);
+        const topComments = await getTopComments(post, 3); // Still get up to 3 comments for this one post
         console.log(`💬 [Main Loop] For post "${post.title.slice(0,50)}...", got ${topComments.length} formatted top comments.`);
 
         const summary = await generateSummary(post.title, topComments);
@@ -271,7 +283,7 @@ export async function GET(req: Request) {
 
         if (insertError || !insertedRecord) {
           console.error(`❌ [DB Insert] Failed for post "${post.title.slice(0,50)}..." of /r/${subreddit}:`, insertError?.message || 'No data returned from insert');
-          continue;
+          continue; 
         }
         console.log(`✅ [DB Insert] Successfully inserted post, new record ID: ${insertedRecord.id}`);
 
@@ -292,7 +304,11 @@ export async function GET(req: Request) {
           console.log(`ℹ️ [DB Update] No summary generated for post "${post.title.slice(0,50)}..." (ID: ${insertedRecord.id}). Skipping update.`);
         }
         insertedPostTitlesForSubreddits[subreddit].push(post.title.slice(0, 50) + '...');
+
+      } else {
+        console.log(`ℹ️ [Main Loop] No top post found for /r/${subreddit} in the last day or result was invalid.`);
       }
+
     } catch (err: unknown) {
       let errorMessage = `An unknown error occurred during processing /r/${subreddit} for user ${user_id}`;
       let errorStack: string | undefined = undefined;
@@ -318,10 +334,10 @@ export async function GET(req: Request) {
   }
 
   console.log('🏁 [/api/ingest-trends] Processing finished.');
-  console.log(`📊 Stats: Total posts aimed to process: ${totalPostsProcessed}, Total summaries generated: ${totalSummariesGenerated}`);
+  console.log(`📊 Stats: Total posts processed: ${totalPostsProcessed}, Total summaries generated: ${totalSummariesGenerated}`);
   return NextResponse.json({
     success: true,
-    message: "Ingestion process completed.",
+    message: "Ingestion process completed (1 top post per subreddit).",
     processedSubreddits: Object.keys(insertedPostTitlesForSubreddits),
     postsIngestedBySubreddit: insertedPostTitlesForSubreddits,
     failedSubreddits: failedSubredditsProcessing,
